@@ -1,0 +1,177 @@
+Bio-Homology-InterologWalk version 0.01
+=======================================
+
+This document refers to version 0.01 of Bio::Homology::InterologWalk.
+This version was released August 31st, 2010.
+
+INSTALLATION-------------------------------------------------------------------------
+
+To install this module on your system, place the tarball archive file in a 
+temporary directory and call the following:
+
+% gunzip Bio-Homology-InterologWalk-0.01.tar.gz
+% tar xf Bio-Homology-InterologWalk-0.01.tar
+% cd Bio-Homology-InterologWalk-0.01
+% perl Makefile.PL
+% make
+% make test
+% make install
+
+DEPENDENCIES-------------------------------------------------------------------------
+
+This module requires the following modules and libraries:
+
+===============
+1.  Ensembl API
+===============
+    
+The Ensembl project is currently branched in two sub-projects:
+
+    The Ensembl Vertebrates project
+        This is of interest to you if you work with vertebrate genomes
+        (although it also includes data from a few non-vertebrate common
+        model organisms). See http://www.ensembl.org/index.html for further
+        details.
+
+    The Ensembl Genomes project
+        This utilises the Ensembl software infrastructure (originally
+        developed in the Ensembl Core project) to provide access to
+        genome-scale data from non-vertebrate species. This is of interest
+        to you if your species is a non-vertebrate, or if your species is a
+        vertebrate but you *also want to obtain results mapped from
+        non-vertebrates*. "Bio::Homology::InterologWalk" currently only
+        supports the metazoa sub-site from the Ensembl Genomes Project. See
+        http://metazoa.ensembl.org/index.html for further details.
+
+    IMPORTANT You will need to decide which Ensembl-DB set you will need
+    prior to installing "Bio::Homology::InterologWalk". The module requests
+    that
+
+    Ensembl API Version == Ensembl-DB set version.
+
+    This means that if you install e.g. API V.58, you will only be able to
+    get data from Ensembl Vertebrates / Metazoa databases V. 58. As the
+    EnsemblGenomes DB releases are one version behind the Ensembl Vertebrate
+    DB release, if you install the bleeding-edge Ensembl Vertebrate API, *a
+    matching EnsemblGenomes DB release might not be available yet*: you will
+    still be able to use "Bio::Homology::InterologWalk" to run an orthology
+    walk using exclusively Ensembl Vertebrate DBs, but you will get an error
+    if you try to choose metazoan databases. See "setup_ensembl_adaptor" for
+    further information.
+
+    Therefore, before installing "Bio::Homology::InterologWalk", you are
+    faced with the following choice:
+
+    a)  If you are exclusively interested in vertebrates (plus the few
+        non-vertebrate model organisms still present in Ensembl Vertebrates)
+        then obtain the APIs and set up the environment by following the
+        steps described on the Ensembl Vertebrates API installation pages:
+
+        http://www.ensembl.org/info/docs/api/api_installation.html
+
+        or alternatively
+
+        http://www.ensembl.org/info/docs/api/api_cvs.html
+
+        This option allows you to get the most recent datasets provided by
+        Ensembl Core. However, you might not be able to query EnsemblCompara
+        data.
+
+    b)  If you are interested in querying/getting back data from vertebrate
+        + metazoan genomes, then obtain the APIs and set up the environment
+        by following the steps described on the Ensembl Metazoa API
+        installation pages: (this allows you to query across a wider
+        selection of taxa)
+
+        http://metazoa.ensembl.org/info/docs/api/api_installation.html
+
+        or alternatively
+
+        http://metazoa.ensembl.org/info/docs/api/api_cvs.html
+
+        This option will probably not use the most recent API+DBs, but will
+        guarantee functionality across both Vertebrate and Metazoan genomes.
+
+    Option (b) is the recommended one.
+
+==========
+2. Bioperl
+==========
+
+    Ensembl should provide a customised Bioperl installation tailored to its
+    API, v. 1.2.3. Should version 1.2.3 be no more available through
+    Ensembl, please obtain release 1.6.x from CPAN. (while not officially
+    supported by the Ensembl Project it will work fine when using the API
+    within the scope of the present module)
+
+    =================================================
+
+    NOTE 1: All the API components ("ensembl", "ensembl-compara",
+    "ensembl-variation", "ensembl-functgenomics") are required. 
+
+    NOTE 2: The
+    module has been tested on Ensembl Vertebrates API & DB v. 58 and v. 59
+    and EnsemblGenomes API & DB v. 5 (58).
+
+EXAMPLE==========================================
+e.g. to install API CORE V.58, do the following:
+
+log into the Ensembl CVS server at Sanger (using password: CVSUSER):
+
+$ cvs -d :pserver:cvsuser@cvs.sanger.ac.uk:/cvsroot/ensembl login
+Logging in to :pserver:cvsuser@cvs.sanger.ac.uk:2401/cvsroot/ensembl
+CVS password: CVSUSER
+Install the Ensembl Core Perl API for version 58
+
+$ cvs -d :pserver:cvsuser@cvs.sanger.ac.uk:/cvsroot/ensembl checkout -r branch-ensembl-58 ensembl
+
+=====================
+3. EXTRA PERL MODULES
+=====================
+You will also need to install the following modules (including all dependencies) from CPAN:
+
+1. REST::Client
+2. GO::Parser
+3. DBD::CSV (requires Perl DBI)
+4. String::Approx
+5. List::Util
+6. File::Glob
+
+SAMPLE SCRIPS--------------------------------------------------------------------------------
+The scripts/Code sub-directory provide an example for the usage of 
+the module. The meaning of the files is as follows:
+
+-doInterologWalk.pl:        example usage of the core methods: given a flat file containing a list of stable flybase ids, this script will use Bio::Homology::InterologWalk
+                            to build a TSV file containing the putative interactors of such ids according to the interolog mapping method.
+
+-getDirectInteractions.pl:  generate a dataset of direct PPIs based on the input ID list
+
+-doScores.pl:               given a tsv obtained with doInterologWalk.pl, this file will compute an aggregated score for each (id, putative interactor) couple, representing a measure
+                            of the reliability of the interaction. The output of this script is a new TSV file containing a new compound score column
+                            
+                            REQUIRES: doInterologWalk.pl getDirectInteractions.pl
+
+-doNets.pl                  given a tsv obtained from doFlyWalk.pl (optionally, processed by doScores.pl to add a compound score column) this script will produce a .sif network file and 
+                            a .noa network attribute file, suitable for importing into the Cytoscape (http://www.cytoscape.org/) network visualisation program. The two files follow the definition 
+                            on page http://cytoscape.org/cgi-bin/moin.cgi/Cytoscape_User_Manual/Network_Formats and have been tested on Cytoscape v. 2.6.2 / 2.6.3
+                            
+                            REQUIRES: doInterologWalk.pl
+                            OPTIONAL: doScores.pl
+
+scripts/Data      contains a psi-mi obo ontology (used by doScores.pl interaction types and 
+                  interaction detection methods) and a small sample Mus musculus dataset. 
+		
+
+
+COPYRIGHT AND LICENSE------------------------------------------------------------------------
+
+Original author:  Giuseppe Gallone
+CPAN ID: GGALLONE
+G.Gallone@sms.ed.ac.uk
+
+Copyright (C) 2010 by Giuseppe Gallone
+This program is free software; you can redistribute
+it and/or modify it under the same terms as Perl itself.
+
+The full text of the license can be found in the
+LICENSE file included with this module.
