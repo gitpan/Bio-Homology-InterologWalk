@@ -19,7 +19,385 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
+
+
+
+#################### main pod documentation begins ###################
+
+=head1 NAME
+
+Bio::Homology::InterologWalk - Retrieve, score and visualize putative Protein-Protein Interactions through the orthology-walk method
+
+=head1 VERSION
+
+This document describes version 0.02 of Bio::Homology::InterologWalk released August 31st, 2010
+
+=head1 SYNOPSIS
+
+  use Bio::Homology::InterologWalk;
+
+First, obtain Intact Interactions for the dataset (see example in C<getDirectInteractions.pl>):
+
+
+  #get a registry from Ensembl
+  my $registry = Bio::Homology::InterologWalk::setup_ensembl_adaptor(
+                                                     connect_to_db  => $ensembl_db,
+                                                     source_org     => $sourceorg,
+                                                     verbose        => 1
+                                                     );
+  
+  
+  #query direct interactions
+  $RC = Bio::Homology::InterologWalk::Direct::get_direct_interactions(
+                                                      registry         => $registry,
+                                                      source_org       => $sourceorg,
+                                                      input_path       => $in_path,
+                                                      output_path      => $out_path,
+                                                      url              => $url,
+                                                      );
+
+
+
+
+do some postprocessing (see L</do_counts> and L</extract_unseen_ids> ) and then run the actual interolog walk on the dataset
+with the following sequence of three methods.
+
+
+get orthologues of starting set:
+
+  $RC = Bio::Homology::InterologWalk::get_forward_orthologies(
+                                              registry        => $registry,
+                                              ensembl_db      => $ensembl_db,
+                                              input_path      => $in_path,
+                                              output_path     => $out_path,
+                                              source_org      => $sourceorg,
+                                              dest_org        => $destorg,
+                                              );
+
+
+
+add interactors of  orthologues found by C<get_forward_orthologies()>:
+
+
+
+  $RC = Bio::Homology::InterologWalk::get_interactions(
+                                       input_path    => $in_path,
+                                       output_path   => $out_path,
+                                       url           => $url,
+                                       );
+
+
+add orthologues of interactors found by C<get_interactions()>:
+
+  $RC = Bio::Homology::InterologWalk::get_backward_orthologies(
+                                               registry    => $registry,
+                                               ensembl_db  => $ensembl_db,
+                                               input_path  => $in_path,
+                                               output_path => $out_path,
+                                               error_path  => $err_path,
+                                               source_org  => $sourceorg,  
+                                               );
+
+do some postprocessing (see L</remove_duplicate_rows>, L</do_counts>, L</extract_unseen_ids>)
+and then optionally compute a composite score
+for the putative interactions obtained:
+
+  $RC = Bio::Homology::InterologWalk::Scores::compute_scores(
+                                             input_path        => $in_path,
+                                             score_path        => $score_path,
+                                             output_path       => $out_path,
+                                             term_graph        => $onto_graph,
+                                             meanscore_it      => $m_it,
+                                             meanscore_dm      => $m_dm,
+                                             meanscore_me_dm   => $m_mdm,
+                                             meanscore_me_taxa => $m_mtaxa
+                                             );
+
+
+get some networks and network attributes which you can then visualise with cytoscape
+
+   $RC = Bio::Homology::InterologWalk::Networks::do_network(
+                                            registry        => $registry,
+                                            input_path      => $in_path,
+                                            output_path     => $out_path,
+                                            source_org      => $sourceorg
+                                            );
+                                               
+   $RC = Bio::Homology::InterologWalk::Networks::do_attributes(
+                                               registry      => $registry,
+                                               input_path    => $in_path,
+                                               output_path   => $out_path,
+                                               source_org    => $sourceorg,
+                                               label_type    => 'external name'
+                                               );
+
+I<The synopsis above only lists the major methods and parameters.>
+
+=head1 DESCRIPTION
+
+
+
+A common activity in computational biology is to mine protein-protein interactions 
+from publicly available databases to build I<Protein-Protein Interaction> (PPI) datasets.  
+In many instances, however, the number of experimentally obtained annotated PPIs is very scarce
+and it would be helpful to enrich the experimental dataset with high-quality, computationally-inferred PPIs.
+Such computationally-obtained dataset can extend, support or enrich experimental PPI datasets, and are
+of crucial importance in high-throughput gene prioritization studies, i.e. to drive hypotheses and restrict the
+dimensionality of functional discovery problems.
+This Perl Module, C<Bio::Homology::InterologWalk>, is aimed at building 
+putative PPI datasets on the basis of  a number of comparative biology paradigms: the module implements 
+a collection of computational biology algorithms based on the concept of "orthology projection". 
+If interacting proteins A and B in organism X have orthologues A' and B' in organism Y, under certain
+conditions one can assume that the interaction will be conserved in organism Y, i.e. the A-B 
+interaction can be "projected through the orthologies" to obtain a putative A'-B' interaction.
+The pair of interactions (A-B) and (A'-B') are named "Interologs".
+
+
+
+C<Bio::Homology::InterologWalk> collects, analyses and collates gene orthology data
+provided by the Ensembl Consortium as well as PPI data provided by
+EBI Intact. It provides the user with the possibility of rating the quality and reliability of 
+the putative interactions collected by means of  confidence scores,
+and optionally outputs network representations of the datasets, 
+compatible with the biological network representation standard, Cytoscape.
+
+=head1 USAGE
+
+=head2 Rationale
+
+
+                              \EBI Intact API/
+         .--------------.            |             .-------------.
+     (2) | A(e.g. mouse)|<------------------------>|   B(mouse)  |  (3)
+         `--------------'          <PPI>           `-------------'
+                ^                                         |
+   /Ensembl\    | <Orthology>                 <Orthology> | \ Ensembl /
+  / Compara \   |                                         |  \Compara/
+ /    Api    \  |                                         |   \ Api /
+                |                                         | 
+         .--------------.                           .-------------.
+     (1) | A'(e.g. fly) |. . . . . . . . . . . . .  |   B'(fly)   | (4)
+         `--------------'     [SCORED]PUTATIVE PPI  `-------------'
+                    (Output of Bio::Homology::InterologWalk)
+
+
+In order to carry out an interolog walk we start with a set of gene identifiers in one organism of interest (1).
+We query those ids against a number of comparative biology  databases to retrieve a list of orthologues for the
+gene ids of interest, in one or more species (2). In the next step we rely instead on PPI databases 
+to retrieve the list of available interactors for the protein ids obtained in (2). The output at this stage consists of
+a list of interactors of the orthologues of the initial gene set, plus several fields of ancillary data (whose importance will
+be explained later) (3). 
+In the last step of the process we will need to project the interactions in (3) - again using orthology data - back
+to the original species of interest. 
+The final output is a list of B<putative interactors> for the initial gene set, plus several
+fields of supporting data. 
+
+C<Bio::Homology::InterologWalk> provides three main functions to carry out the basic walk, C<get_forward_orthologies()> , C<get_interactions()> and  
+C<get_backward_orthologies()>. These functions must be called strictly in sequential order in the user's script, as they process, analyse and attach data to the output 
+in a pipeline-like fashion, i.e. working on the output of the preceding function.
+
+
+=over 4
+
+=item  get_forward_orthologies
+
+This methods queries the initial gene list against one or more Ensembl DBs (using the Ensembl Perl API) and retrieves their orthologues, 
+plus a number of ancillary data fields ( conservation data, distance from ancestor, orthology type, etc) 
+
+=item get_interactions
+
+This queries the orthology list built in the previous stage against PSICQUIC-enabled PPI DBs using Rest. 
+This step will enrich the dataset built through C<get_forward_orthologies> with the interactors of those orthologues, if any, plus ancillary data (including several
+parameters describing the quality, nature and origin of the annotated interaction).
+
+=item get_backward_orthologies
+
+This queries the interactor list built in the previous stage against one or more Ensembl DBs (again  using the Ensembl Perl API)
+to find orthologues back in the original species of interest. It will also adds a number of supplementary information fields, specularly to what done in C<get_forward_orthologies>.  
+
+=back
+
+The output of this sequence of subroutines will be a TSV file containing zero or more entries, closely resembling  the MITAB tab delimited data exchange format from the  HUPO PSI (Proteomics Standards Initiative).
+Each row in the data file represents a binary putative interaction, plus currently 37 supplementary data fields.
+
+This basic output can then be further processed with the help of other methods in the module: one can scan the results to compute counts, 
+to check for duplicates, to verify the presence of new gene ids that were not present in the original dataset and save them in another datafile, and so on.
+
+Most importantly, the user could need to further process the putative PPIs dataset to do one or more of the following:
+
+
+=over
+
+=item 1.
+
+Compute a global confidence score to obtain a metric for the reliability of the each binary putative interaction
+
+=item 2.
+
+Extract the binary putative PPIs from the dataset and save them in a format compatible with Cytoscape. This helps providing a visual quality to the result as 
+one could then apply network analysis tools to discover motifs, clusters, well-connected subnetworks, look for GO functional enrichment, and more. 
+The format chosen for the network representation of the dataset is currently C<.sif>. (see http://cytoscape.wodaklab.org/wiki/Cytoscape_User_Manual#Supported_Network_File_Formats) 
+The generation of node attributes is also possible, to allow for visualisation of node tags in terms of simpler human readable labels instead of database IDs.
+
+=item 3.
+
+Obtain a dataset of experimental/direct PPIs (i.e. just plain interactors, 
+no orthology mapping across other taxa involved) from the gene list used as the input to the orthology walk. The reasons why this might be useful are several. 
+The user might want to compare this dataset with the putative PPI dataset also generated by the module to see if/where the two overlap, 
+what is the intersection/difference set, and more. See L</get_direct_interactions> for documentation relative to this function. Please also notice a dataset of 
+direct interactions will also be pre-requisite if the user intends to compute confidence values for the putative PPI dataset: the direct PPI dataset is required to
+compute score normalisation means.
+
+=back
+
+
+=head1 EXAMPLES
+
+In order to demonstrate one way of using the module, four example perl scripts are provided in the C<scripts/Code> directory. 
+Each sample script utilises the module and uses/reuses subroutines in a pipeline fashion. The workflow suggested with the scripts is as follows:
+
+B<User Input>: a textfile containing one gene ID per row. All gene IDs must belong to the same species. All gene IDs must be current Ensembl gene IDs.
+
+
+=over
+
+=item 1. B<Mine Direct Interactions.>
+
+Generate a dataset of direct PPIs based on the input ID list. See example in C<getDirectInteractions.pl>
+
+=item 2. B<Run the basic Interolog-Walk Pipeline.>
+
+Generate dataset of projected putative PPIs following the paradigm explained earlier. Do some postprocessing on the dataset. See example in C<doInterologWalk.pl>
+
+=item 3. B<Compute confidence scores for putative PPIs.>
+
+Score the dataset obtained in (2.) using the dataset obtained in (1.) to normalise the score components values. See example in C<doScores.pl>
+
+=item 4. B<Extract network and attributes for the two PPI datasets.>
+
+For each of the two datasets obtained from (1) and (2) (putative PPIs) or from (1) and (3) (scored putative PPIs) extract a text file containing a network representation and 
+a text file of node attributes. 
+
+See example in C<doNets.pl>
+
+=back
+
+
+=head1 DEPENDENCIES 
+
+C<Bio::Homology::InterologWalk> relies on the following prerequisite packages.
+
+=head2 Ensembl API
+
+The Ensembl project is currently branched in two sub-projects:
+
+=over
+
+=item The Ensembl Vertebrates project 
+
+This is of interest to you if you work with vertebrate genomes (although it also includes data from a few non-vertebrate common model organisms).
+See http://www.ensembl.org/index.html for further details.
+
+=item The Ensembl Genomes project 
+
+This utilises the Ensembl software infrastructure (originally developed in the Ensembl Core project) to provide 
+access to genome-scale data from non-vertebrate species. This is of interest to you if your species  is a non-vertebrate, or if
+your species  is a vertebrate but you I<also want to obtain results mapped from non-vertebrates>. C<Bio::Homology::InterologWalk> currently only supports
+the B<metazoa> sub-site from the Ensembl Genomes Project. See http://metazoa.ensembl.org/index.html for further details.
+
+=back 
+
+
+
+B<IMPORTANT> You will need to decide which Ensembl-DB set you will need B<prior> to installing C<Bio::Homology::InterologWalk>.  
+The module requests that 
+
+Ensembl API Version == Ensembl-DB set version. 
+
+This means that if you install e.g. API V.58, 
+you will only be able to get data from Ensembl Vertebrates / Metazoa databases V. 58. As the EnsemblGenomes DB releases are 
+B<one version behind> the Ensembl Vertebrate DB release, if you install the bleeding-edge Ensembl Vertebrate API, I<a matching EnsemblGenomes DB release might
+not be available yet>: you will still be able to use C<Bio::Homology::InterologWalk> to run an orthology walk using exclusively Ensembl Vertebrate DBs, but you
+will get an error if you try to choose metazoan databases. See L</setup_ensembl_adaptor> for further information.
+
+
+Therefore, before installing C<Bio::Homology::InterologWalk>, you are faced with the following choice: 
+
+=over
+
+=item a)
+
+If you are exclusively interested in B<vertebrates> (plus the few
+non-vertebrate model organisms still present in Ensembl Vertebrates) then obtain the APIs and
+set up the environment by following the steps described on the Ensembl Vertebrates API installation pages:
+
+http://www.ensembl.org/info/docs/api/api_installation.html
+
+or alternatively
+
+http://www.ensembl.org/info/docs/api/api_cvs.html
+
+This option allows you to get the B<most recent> datasets provided by Ensembl Core. However, you might not be able to query EnsemblCompara data.
+
+=item b) 
+
+If you are interested in querying/getting back data from vertebrate + metazoan genomes, then obtain the APIs
+and set up the environment by following the steps described on the Ensembl Metazoa API installation pages: 
+(this allows you to query across a wider selection of taxa)
+
+http://metazoa.ensembl.org/info/docs/api/api_installation.html
+
+or alternatively
+
+http://metazoa.ensembl.org/info/docs/api/api_cvs.html
+
+This option will probably not use the most recent API+DBs, but will guarantee functionality across both Vertebrate and Metazoan genomes.
+
+=back
+
+Option (b) is the B<recommended> one.
+
+NOTE 1: All the API components  (C<ensembl>, C<ensembl-compara>, C<ensembl-variation>, C<ensembl-functgenomics>) are required.
+
+NOTE 2: The module has been tested on Ensembl Vertebrates API & DB v. 58 and v. 59 and EnsemblGenomes API & DB  v. 5 (58). 
+
+=head2 Bioperl
+
+Ensembl provides a customised Bioperl installation tailored to its API, v. 1.2.3. 
+Should version 1.2.3 be no more available through Ensembl, please obtain release 1.6.x from CPAN. (while not officially supported by the
+Ensembl Project it will work fine when using the API within the scope of the present module)
+
+=head2 Additional Perl Modules
+
+The following modules (including all dependencies) from CPAN are also required:
+
+=over
+
+=item 1. C<REST::Client>
+
+=item 2. C<GO::Parser>
+
+=item 3. C<DBD::CSV> (requires Perl DBI)
+
+=item 4. C<String::Approx>
+
+=back
+
+I<See the README file for further information.>
+
+
+=head1 INTERFACE
+
+=cut
+
+
+#################### main pod documentation ends ###################
+
+
+
+
+
 
 #globals#############################
 my $ENSEMBLIDFAILED;
@@ -133,23 +511,31 @@ my $HEADER_DIRECT             =    join("\t", $FN_initid, $FN_interaction_id,
                                                              dest_org        => $destorg,
                                                              verbose         => 1
                                                              );
- Purpose   : This subroutine sets up the registry for connection to the Ensembl API and also gets a species-dependent adaptor out of it
+ Purpose   : This subroutine sets up the registry for connection to the Ensembl API and also gets 
+             a species-dependent adaptor out of it
  Returns   : An Ensembl Registry object if successful, undefined in all other cases
  Argument  : -connect_to_db: ensembl db to connect to. Choices currently are:
                  a. 'multi' :  vertebrate compara (see http://www.ensembl.org/)
-                 b. 'pan_homology' : pan taxonomic compara db, a selection of species from both Ensembl Compara and EnsemblGenomes Compara
+                 b. 'pan_homology' : pan taxonomic compara db, a selection of species from both 
+                    Ensembl Compara and EnsemblGenomes Compara
                     (see http://nar.oxfordjournals.org/cgi/content/full/38/suppl_1/D563 )
-                 c. 'metazoa' : EnsemblGenomes compara, metazoa db (see http://metazoa.ensembl.org/index.html). 
+                 c. 'metazoa' : EnsemblGenomes compara, metazoa db 
+                    (see http://metazoa.ensembl.org/index.html). 
                  d. 'all'  : multi + metazoa.
                  Default is 'multi'.
-             -source_org: the initial species for the interolog walk. This MUST match with your choice of db. Exception is raised if not
-             -(OPTIONAL) dest_org: the destination species to use for the interolog walk. This MUST exist in your choice of db. "all" 
+             -source_org: the initial species for the interolog walk. This MUST match with your 
+              choice of db. Exception is raised if not
+             -(OPTIONAL) dest_org: the destination species to use for the interolog walk. This 
+              MUST exist in your choice of db. "all" 
                chooses all the taxa offered by Ensemlb in that DB. Default is 'all'
-             -(OPTIONAL) verbose: boolean, shows/hides connection info provided by Ensembl. Default is '0' 
+             -(OPTIONAL) verbose: boolean, shows/hides connection info provided by Ensembl. 
+              Default is '0' 
  Throws    : -
- Comment   : Currently the FULL SCIENTIFIC NAME of both the source organism and the destination organism, as specified in Ensembl, is required.
-               E.g.: 'Homo sapiens', 'Mus musculus', 'Drosophila melanogaster', etc. 
-               Soon to be expanded to support short mnemonic names (e.g.: 'Mmus' instead of 'Mus musculus')
+ Comment   : Currently the FULL SCIENTIFIC NAME of both the source organism and the destination 
+             organism, as specified in Ensembl, is required.
+             E.g.: 'Homo sapiens', 'Mus musculus', 'Drosophila melanogaster', etc. 
+             Soon to be expanded to support short mnemonic names 
+             (e.g.: 'Mmus' instead of 'Mus musculus')
 
 See Also   : 
 
@@ -273,17 +659,23 @@ sub setup_ensembl_adaptor{
                                                        output_path  => $out_path,
                                                        header       => 'standard',
                                                        );
- Purpose   : This is used to clean up a TSV data file of duplicate entries. Occasionally, Intact can return duplicate
-             entries. This routine will make sure no such duplicates are kept. A new datafile is built. 
-             The number of unique data rows is updated. 
+ Purpose   : This is used to clean up a TSV data file of duplicate entries. 
+             This routine will make sure no such duplicates are kept. A new datafile 
+             is built. The number of unique data rows is updated. 
  Returns   : success/error
- Argument  : -input_path : path to input file. Input file for this subroutine is a TSV file of PPIs. It can be one of the following two:
-                 1. the output of get_backward_orthologies(). In this case please specify 'standard' header below.
-                 2. the output of get_direct_interactions(). In this case please specify 'direct' header below.             
-             -output_path : where you want the routine to write the data. Data is in TSV format. 
+ Argument  : -input_path : path to input file. Input file for this subroutine is 
+              a TSV file of PPIs. It can be one of the following two:
+                 1. the output of get_backward_orthologies(). In this case please 
+                    specify 'standard' header below.
+                 2. the output of get_direct_interactions(). In this case please 
+                    specify 'direct' header below.             
+             -output_path : where you want the routine to write the data. Data is in 
+              TSV format. 
              -(OPTIONAL)header : Header type is one of the following:
-                 1. 'standard': when the routine is used to clean up an interolog-walk file (the header will be longer)
-                 2. 'direct':   when the routine is used to clean up a file of real db interactions (the header is shorter)
+                 1. 'standard': when the routine is used to clean up an interolog-walk 
+                    file (the header will be longer)
+                 2. 'direct':   when the routine is used to clean up a file of real db 
+                    interactions (the header is shorter)
                No field provided: default is 'standard'
  Throws    : -
  Comment   : -
@@ -369,34 +761,46 @@ sub remove_duplicate_rows{
                                                          hq_only       => 1
                                                          no_output     => 0
                                                          );
- Purpose   : This is the core function to perform the orthology retrieval step of the Interolog mapping algorithm. It will set up some
-             important Ensembl components and then proceed with the composition/computation of the values
+ Purpose   : This is the core function to perform the orthology retrieval step of the 
+             Interolog mapping algorithm. It will set up some important Ensembl components 
+             and then proceed with the composition/computation of the values
  Returns   : success/error code
  Argument  : -registry object to connect to ensembl
              -ensembl db to connect to. Choices currently are:
                  a. 'multi' :  vertebrate compara (see http://www.ensembl.org/)
-                 b. 'pan_homology' : pan taxonomic compara db, a selection of species from both Ensembl Compara and Ensembl Genomes 
+                 b. 'pan_homology' : pan taxonomic compara db, a selection of species 
+                    from both Ensembl Compara and Ensembl Genomes 
                     (see http://nar.oxfordjournals.org/cgi/content/full/38/suppl_1/D563 )
-                 c. 'metazoa' : ensembl compara genomes, metazoa db (see http://metazoa.ensembl.org/index.html). 
+                 c. 'metazoa' : ensembl compara genomes, metazoa db 
+                    (see http://metazoa.ensembl.org/index.html). 
                  d. 'all'  : multi + metazoa.
                  Default is 'multi'.
-             -input_path : path to input file. Input file MUST be a text file with one entry per row, each entry containing an up-to-date
-              gene ID recognised by the Ensembl consortium (http://www.ensembl.org/) followed by a new line char.
-             -output_path : where you want the routine to write the data. Data is in TSV format.
+             -input_path : path to input file. Input file MUST be a text file with one entry
+              per row, each entry containing an up-to-date gene ID recognised by the Ensembl 
+              consortium (http://www.ensembl.org/) followed by a new line char.
+             -output_path : where you want the routine to write the data. Data is in TSV 
+              format.
              -source organism name (eg: 'Mus musculus')
-             -(OPTIONAL)destination organism name (eg 'Drosophila melanogaster'). Set this is if you want to carry out the mapping through one 
+             -(OPTIONAL)destination organism name (eg 'Drosophila melanogaster'). Set this is 
+              if you want to carry out the mapping through one 
               specific species, rather than all those available in Ensembl. Default : 'all'
-             -(OPTIONAL)hq_only: discards one-to-many, many-to-one, many-to-many orthologues. Only keeps one-to-one orthologues, i.e. where
-              no duplication event has happened after the speciation. One-to-one orthologues are ideally associated with higher functional
-              conservation (while paralogues often cause neo/sub-functionalisation). For further information see
+             -(OPTIONAL)hq_only: discards one-to-many, many-to-one, many-to-many orthologues. 
+              Only keeps one-to-one orthologues, i.e. where no duplication event has happened 
+              after the speciation. One-to-one orthologues are ideally associated with higher 
+              functional conservation (while paralogues often cause neo/sub-functionalisation). 
+              For further information see
               http://www.ensembl.org/info/docs/compara/homology_method.html 
-             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output during test. Default is 0.
+             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output during 
+              test. Default is 0.
  Throws    : -
- Comment   : 1)Currently the FULL SCIENTIFIC NAME of both the source species and the destination species, as specified in Ensembl, is required.
+ Comment   : 1)Currently the FULL SCIENTIFIC NAME of both the source species and the destination 
+               species, as specified in Ensembl, is required.
                E.g.: 'Homo sapiens', 'Mus musculus', 'Drosophila melanogaster', etc. 
-               Soon to be expanded to support short mnemonic names (e.g.: 'Mmus' instead of 'Mus musculus')
-             2)EXPERIMENTAL: early support for human readable gene names in the input file has been added. Such gene names will be checked against Ensembl
-               so they must be recognisable by it.
+               Soon to be expanded to support short mnemonic names (e.g.: 'Mmus' instead of 
+               'Mus musculus')
+             2)EXPERIMENTAL: early support for human readable gene names in the input file has been 
+               added. Such gene names will be checked against Ensembl so they must be recognisable 
+               by it.
 
 
 See Also   : 
@@ -587,25 +991,47 @@ sub get_forward_orthologies{
                                                   physical_only  => 1,
                                                   no_output      => 0 
                                                   );
- Purpose   : this methods allows  to query the Intact database using the REST interface. IntAct is the Molecular Interaction database at the European Bioinformatics Institute (UK).
-             The Intact project offers programmatic access to their data through the PSICQUIC specification (see http://code.google.com/p/psicquic/wiki/PsicquicSpecification).
-             This subroutine interrogates via Rest the Intact PPI db with a list of ensembl gene ids (obtained usually from get_forward_orthologies()), obtains data in the
-             PSI-MI TAB format (see http://code.google.com/p/psimi/wiki/PsimiTabFormat), processes it and appends it to the input data. 
+ Purpose   : this methods allows  to query the Intact database using the REST interface. 
+             IntAct is the Molecular Interaction database at the European Bioinformatics 
+             Institute (UK). The Intact project offers programmatic access to their data 
+             through the PSICQUIC specification 
+             (see http://code.google.com/p/psicquic/wiki/PsicquicSpecification).
+             This subroutine interrogates via Rest the Intact PPI db with a list of ensembl
+             gene ids (obtained usually from get_forward_orthologies()), obtains data in 
+             the PSI-MI TAB format (see http://code.google.com/p/psimi/wiki/PsimiTabFormat), 
+             processes it and appends it to the input data. 
  Returns   : success/failure code
- Argument  : -input_path : path to input file. Input file for this subroutine is the output of get_forward_orthologies()
-             -output_path : where you want the routine to write the data. Data is in TSV format.
-             -url : url for the REST service to query (currently only EBI Intact PSICQUIC Rest)
-             -(OPTIONAL) no_spoke: if set, interactions obtained from the expansion of complexes through the SPOKE method (see http://nar.oxfordjournals.org/cgi/content/full/38/suppl_1/D525)
+ Argument  : -input_path : path to input file. Input file for this subroutine is the 
+              output of get_forward_orthologies()
+             -output_path : where you want the routine to write the data. Data is in TSV 
+              format.
+             -url : url for the REST service to query (currently only EBI Intact PSICQUIC 
+              Rest)
+             -(OPTIONAL) no_spoke: if set, interactions obtained from the expansion of 
+              complexes through the SPOKE method 
+              (see http://nar.oxfordjournals.org/cgi/content/full/38/suppl_1/D525)
               will be ignored
-             -(OPTIONAL) exp_only: if set, only interactions whose MITAB25 field "Interaction Detection Method" (MI:0001 in the PSI-MI controlled vocabulary) is at least "experimental interaction detection" 
-              (MI:0045 in the PSI-MI controlled vocabulary) will be retained. I.e. if set, this flag only allows experimentally detected interactions to be retained and stored in the data file
-             -(OPTIONAL) physical_only: if set, only interactions whose MITAB25 field "Interaction Type" (MI:0190 in the PSI-MI controlled vocabulary) is at least "physical association" 
-              (MI:0915 in the PSI-MI controlled vocabulary) will be retained. I.e. if set, this flag only allows physically associated PPIs to be retained and stored in the data file: colocalizations and
-              genetic interactions will be discarded
-             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output during test. Default is 0.
+             -(OPTIONAL) exp_only: if set, only interactions whose MITAB25 field "Interaction 
+              Detection Method" (MI:0001 in the PSI-MI controlled vocabulary) is at 
+              least "experimental interaction detection" 
+              (MI:0045 in the PSI-MI controlled vocabulary) will be retained. I.e. if set, 
+              this flag only allows experimentally detected interactions to be retained and 
+              stored in the data file
+             -(OPTIONAL) physical_only: if set, only interactions whose MITAB25 field 
+              "Interaction Type" (MI:0190 in the PSI-MI controlled vocabulary) is at least 
+              "physical association" 
+              (MI:0915 in the PSI-MI controlled vocabulary) will be retained. I.e. if set, 
+              this flag only allows physically associated PPIs to be retained and stored 
+              in the data file: colocalizations and genetic interactions will be discarded
+             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output 
+              during test. Default is 0.
  Throws    : -
- Comment   : -will soon be extended to work with other PSICQUIC-enabled protein interaction dbs (for a list, see http://www.ebi.ac.uk/Tools/webservices/psicquic/registry/registry?action=STATUS)
+ Comment   : -will soon be extended to work with other PSICQUIC-enabled protein interaction 
+              dbs (for a list, see 
+              http://www.ebi.ac.uk/Tools/webservices/psicquic/registry/registry?action=STATUS)
              -need to merge with get_direct_interactions. Maybe create core sub, then share.
+
+
 See Also   : L</get_forward_orthologies>
 
 =cut
@@ -756,31 +1182,43 @@ sub get_interactions{
                                                           hq_only       => $onetoone,
                                                           no_output     => 0
                                                           );
- Purpose   : this routine mines orthologues back into the organism of interest. It accepts as an input a data file containing interactions in the 
-             destination organism(s) and maps those back to the source organism through orthology. 
-             Such orthologues represent the putative interactors of the original genes as requested.
+ Purpose   : this routine mines orthologues back into the organism of interest. It accepts 
+             as an input a data file containing interactions in the destination organism(s) 
+             and maps those back to the source organism through orthology. 
+             Such orthologues represent the putative interactors of the original genes as 
+             requested.
  Returns   : success/error
  Argument  : -registry: registry object for ensembl connection
              -ensembl db to connect to. Choices currently are:
                  a. 'multi' :  vertebrate compara (see http://www.ensembl.org/)
-                 b. 'pan_homology' : pan taxonomic compara db, a selection of species from both Ensembl Compara and Ensembl Genomes 
+                 b. 'pan_homology' : pan taxonomic compara db, a selection of species from 
+                    both Ensembl Compara and Ensembl Genomes 
                     (see http://nar.oxfordjournals.org/cgi/content/full/38/suppl_1/D563 )
-                 c. 'metazoa' : ensembl compara genomes, metazoa db (see http://metazoa.ensembl.org/index.html). 
+                 c. 'metazoa' : ensembl compara genomes, metazoa db 
+                    (see http://metazoa.ensembl.org/index.html). 
                  d. 'all'  : multi + metazoa.
                  Default is 'multi'.
-             -input_path : path to input file. Input file for this subroutine is the output of get_interactions().
-             -output_path : where you want the routine to write the data. Data is in TSV format.
-             -(OPTIONAL)error_path: each query to intact through psicquic returns a data entry including 
-               a binary protein interaction. The two ids returned are, most of the times, uniprotkb ids. Sometimes, however, Intact
-               annotates its binary interactions using an internal, proprietary ID (e.g.: EBI-1080281 ). While the Ensembl API recognises UniprotKB IDs,
-               it won't recognise these Intact IDs. Entries annotated in such a way cannot therefore be completed. If error_path is present, it indicates
-               a file where the routine will dump all such failed entries for later manual inspection.
+             -input_path : path to input file. Input file for this subroutine is the output 
+              of get_interactions().
+             -output_path : where you want the routine to write the data. Data is in TSV 
+              format.
+             -(OPTIONAL)error_path: each query to intact through psicquic returns a data 
+               entry including a binary protein interaction. The two ids returned are, most 
+               of the times, uniprotkb ids. Sometimes, however, Intact annotates its binary 
+               interactions using an internal, proprietary ID (e.g.: EBI-1080281 ). While the 
+               Ensembl API recognises UniprotKB IDs,it won't recognise these Intact IDs. Entries 
+               annotated in such a way cannot therefore be completed. If error_path is present, 
+               it indicates a file where the routine will dump all such failed entries for later 
+               manual inspection.
              -source organism name (eg: "Mus musculus")
-             -(OPTIONAL)hq_only: discards one-to-many, many-to-one, many-to-many orthologues. Only keeps one-to-one orthologues, i.e. where
-              no duplication event has happened after the speciation. One-to-one orthologues are ideally associated with higher functional
-              conservation (while paralogues often cause neo/sub-functionalisation). For further information see
+             -(OPTIONAL)hq_only: discards one-to-many, many-to-one, many-to-many orthologues. 
+              Only keeps one-to-one orthologues, i.e. where no duplication event has happened 
+              after the speciation. One-to-one orthologues are ideally associated with higher 
+              functional conservation (while paralogues often cause neo/sub-functionalisation). 
+              For further information see
               http://www.ensembl.org/info/docs/compara/homology_method.html 
-             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output during test. Default is 0.
+             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output during 
+              test. Default is 0.
  Throws    : -
  Comment   : Destination species is automatically dealt with on a case-to-case basis.
            : 'ensembl_db' must be the same  for all the other subroutines in the pipeline
@@ -1092,29 +1530,39 @@ sub get_backward_orthologies{
                                            header      => 'standard',
                                            no_output   => 0
                                            );
- Purpose   : The purpose of this routine is to scan the data produced by get_backward_orthologies() or get_direct_interactions()  
-             (optionally cleaned up of duplicates by remove_duplicate_rows() ) and compute counts/statistics useful for scoring purposes.
+ Purpose   : The purpose of this routine is to scan the data produced by get_backward_orthologies() 
+             or get_direct_interactions() (optionally cleaned up of duplicates by 
+             remove_duplicate_rows() ) and compute counts/statistics useful for scoring purposes.
              In short, the subroutine:
              1)evaluates if an interaction has been obtained through more than one detection method
              2)evaluates if an interaction has been obtained through more than one taxon
-             3)COUNTS the number of *unique* putative interactions found: remember that the same interaction can be retrieved through
-               several different interacting destination-species orthologues. This script also adds the retrieved "number seen" number 
-               and appends it to the TSV file. 
+             3)COUNTS the number of *unique* putative interactions found: remember that the same 
+               interaction can be retrieved through several different interacting destination-species 
+               orthologues. This script also adds the retrieved "number seen" number and appends it 
+               to the TSV file. 
              4)flags the entry with Y if the putative interaction is an autointeraction
-             5)flags the entry if the real interaction in the destination species (the one we are mapping from) is an autointeraction
-             The routine rewrites the input file in a new file, adding 1 or more data fields (depending on the 'header' argument) containing
-             the results of the count.
+             5)flags the entry if the real interaction in the destination species (the one we are 
+               mapping from) is an autointeraction
+             The routine rewrites the input file in a new file, adding 1 or more data fields 
+             (depending on the 'header' argument) containing the results of the count.
  Returns    : success/fail
- Argument   : -input_path : path to input file. Input file for this subroutine is a TSV file of PPIs. It can be one of the following two:
-                 1. the output of get_backward_orthologies(). In this case please specify 'standard' header below.
-                 2. the output of get_direct_interactions(). In this case please specify 'direct' header below.   
-              It is advisable to pre-process the input by using remove_duplicate_rows() prior to this routine.          
+ Argument   : -input_path : path to input file. Input file for this subroutine is a TSV file of PPIs. 
+              It can be one of the following two:
+                 1. the output of get_backward_orthologies(). In this case please specify 'standard' 
+                    header below.
+                 2. the output of get_direct_interactions(). In this case please specify 'direct' 
+                    header below.   
+              It is advisable to pre-process the input by using remove_duplicate_rows() prior to 
+              this routine.          
              -output_path : where you want the routine to write the data. Data is in TSV format. 
              -(OPTIONAL) header : Header type is one of the following:
-                 1. 'standard': when the routine is used to compute counts on an interolog-walk file (the header will be longer)
-                 2. 'direct':   when the routine is used to compute counts on a real db interactions file (the header is shorter)
+                 1. 'standard': when the routine is used to compute counts on an interolog-walk file 
+                    (the header will be longer)
+                 2. 'direct':   when the routine is used to compute counts on a real db interactions 
+                    file (the header is shorter)
                No field provided: default is 'standard'
-             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output during test. Default is 0.
+             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output during test. 
+              Default is 0.
  Throws    : -
  Comment   : -
 
@@ -1265,19 +1713,26 @@ sub do_counts{
                                                     output_path   => $out_path,
                                                     hq_only       => $onetoone,
                                                     );
- Purpose   : it is often desirable to know if the interolog procedure found new ids at all (i.e. not present in the starting dataset). Such
-             new ids can then be analysed further, ie. sent through GO term enrichment analysis, etc, to provide some validation, see if they have
-             been know before to belong to some specific process, check if no function is associated to them at all.
+ Purpose   : it is often desirable to know if the interolog procedure found new ids at all 
+             (i.e. not present in the starting dataset). Such new ids can then be analysed 
+             further, ie. sent through GO term enrichment analysis, etc, to provide some 
+             validation, see if they have been know before to belong to some specific process, 
+             check if no function is associated to them at all.
              This script will create a simple textfile containing all the new ids discovered.
-             This script is meant to be employed as a last step in the pipeline. It also computes some simple statistics as follows:
+             This script is meant to be employed as a last step in the pipeline. It also 
+             computes some simple statistics as follows:
              1. The list of NEW ids, ie those not present in the initial data file
              2. The frequencies, new vs total, old vs total
-             3. the frequencies of new when the Expansion Method is not spoke and when orthology is one_to_one (i.e.: new ids with high reliability)
+             3. the frequencies of new when the Expansion Method is not spoke and when orthology 
+             is one_to_one (i.e.: new ids with high reliability)
  Returns   : Success/Fail
- Argument  : -start_path: path to the original text file with the ids of interest (the same file given to get_forward_orthologies() as input)
-             -input_path : path to input file. Input file for this subroutine is the output of do_counts().
+ Argument  : -start_path: path to the original text file with the ids of interest (the same file 
+              given to get_forward_orthologies() as input)
+             -input_path : path to input file. Input file for this subroutine is the output of 
+              do_counts().
              -output_path : where you want the routine to write the data. Data is in TSV format.
-             -(OPTIONAL)hq_only : if this is set, only entries mapped exclusively through one-to-one orthologies will be taken into account.
+             -(OPTIONAL)hq_only : if this is set, only entries mapped exclusively through 
+              one-to-one orthologies will be taken into account.
  Throws    : -
  Comment   : -
 
@@ -1955,13 +2410,21 @@ my $NNDIST_THRESHOLD = 100;
 
 =head2 parse_ontology
 
- Usage     : $onto_graph = Bio::Homology::InterologWalk::Scores::parse_ontology($ont_path);
- Purpose   : This subroutine accepts one input, a path to a PSI-MI ontology file. It uses GO::Parser to parse the file and returns 
-             a graph object of the ontology: a structured graph-representation of it, that we can walk and explore. This is useful 
-             when we need to look at the detection method and at the interaction type for each entry. E.g. we might be interested in 
-             all interactions tagged generically with "experimental detection method" but also in all the interactions tagged with 
-             a *specific* detection method (ie a specialised subclass of the concept "experimental detection method").
-             Analysing the structure of the ontology through the graph returned by this method helps in doing that.
+ Usage     : $onto_graph = 
+                 Bio::Homology::InterologWalk::Scores::parse_ontology(
+                                                                    $ont_path
+                                                                    );
+ Purpose   : This subroutine accepts one input, a path to a PSI-MI ontology file. 
+             It uses GO::Parser to parse the file and returns a graph object of 
+             the ontology: a structured graph-representation of it, that we can 
+             walk and explore. This is useful when we need to look at the detection 
+             method and at the interaction type for each entry. E.g. we might be in-
+             terested in all interactions tagged generically with "experimental 
+             detection method" but also in all the interactions tagged with 
+             a *specific* detection method (ie a specialised subclass of the concept 
+             "experimental detection method").
+             Analysing the structure of the ontology through the graph returned by 
+             this method helps in doing that.
  Returns   : A graph object containing the structured ontology
  Argument  : The path to the psi-mi ontology file
  Throws    : -
@@ -1983,21 +2446,29 @@ sub parse_ontology{
 
 =head2 get_mean_scores
 
- Usage     : ($m_em, $m_it, $m_dm, $m_mdm) = Bio::Homology::InterologWalk::Scores::get_mean_scores($intact_path,$onto_graph);
- Purpose   : This is used to compute suitable mean values to normalise the components of the score for
+ Usage     : ($m_em, $m_it, $m_dm, $m_mdm) = 
+             Bio::Homology::InterologWalk::Scores::get_mean_scores(
+                                                             $intact_path,
+                                                             $onto_graph
+                                                             );
+ Purpose   : This is used to compute suitable mean values to normalise the components of 
+             the score for
              - interaction type, 
              - interaction detection method
              - experimental method
              - multiple detection method.
-             Each value is the MEAN value for the corresponding score computed on the set of direct experimental interactions for the initial
-             dataset. These are used to normalise the scores obtained for the corresponding putative interactions.
+             Each value is the MEAN value for the corresponding score computed on the set of 
+             direct experimental interactions for the initial dataset. These are used to 
+             normalise the scores obtained for the corresponding putative interactions.
  Returns   : a list of four numbers: 
              1. mean experimental method score
              2. mean interaction type score, 
              3. mean detection method score
              4. mean multiple dm score
- Argument  : 1) path to a tsv file of REAL intact interactions (generated by get_direct_interactions())
-             2) a graph representation of the obo PSI MI ontology (generated by parse_ontology() )
+ Argument  : 1) path to a tsv file of REAL intact interactions 
+                (generated by get_direct_interactions())
+             2) a graph representation of the obo PSI MI ontology 
+                (generated by parse_ontology() )
  Throws    : -
  Comment   : -
 
@@ -2167,35 +2638,40 @@ sub _get_multiple_taxa_mean_score{
                                                         meanscore_me_taxa => $m_mtaxa,
                                                         no_output         => 0
                                                         );
- Purpose   : This is used to analyse several ancillary data fields obtained alongside the actual putative PPI IDs and collate them into
-             a global confidence score, which should provide a measure of the reliability of each putative PPI. The score will take into account 
-             a number of variables related to each of the steps involved in the orthology walk. We can divide the meta-score related components in
-             two broad classes:
-             - parameters related to the interaction. These include: Interaction Type, Interaction Detection Method, Interaction coming 
-               from a SPOKE-expanded complex,
-               interaction reconfirmed through multiple taxa, interaction reconfirmed through multiple detection methods
-             - parameters related to the two orthology mappings. These include: orthology type (one-to-one, one-to-many, many-to-one, many-to-many),
-               OPI (percentage identity of the conserved columns - see Bio::SimpleAlign), node to node distance, distance from the first shared ancestor,
-               (under development) dN/dS ratio
-             The score computation will also involve a normalisation stage. The subroutine requires five arguments (meanscore_x) representing mean 
-             values to be used for normalisation.
-             The actually means are computed in get_mean_scores(), which is pre-requisite to compute_scores().
+ Purpose   : This is used to analyse several ancillary data fields obtained alongside the actual 
+             putative PPI IDs and collate them into a global confidence score, which should provide 
+             a measure of the reliability of each putative PPI. The score will take into account 
+             a number of variables related to each of the steps involved in the orthology walk. 
+             We can divide the meta-score related components in two broad classes:
+             - parameters related to the interaction. These include: Interaction Type, Interaction 
+               Detection Method, Interaction coming from a SPOKE-expanded complex, interaction recon-
+               firmed through multiple taxa, interaction reconfirmed through multiple detection methods
+             - parameters related to the two orthology mappings. These include: orthology type 
+               (one-to-one, one-to-many, many-to-one, many-to-many), OPI (percentage identity of the 
+               conserved columns - see Bio::SimpleAlign), node to node distance, distance from the 
+               first shared ancestor, (under development) dN/dS ratio
+             The score computation will also involve a normalisation stage. The subroutine requires 
+             five arguments (meanscore_x) representing mean values to be used for normalisation.
+             The actually means are computed in get_mean_scores(), which is pre-requisite to 
+             compute_scores().
  Returns   : success/failure
- Argument  : -input_path : path to the input tsv file. A suitable input for this subroutine is the final output of the orthology walk pipeline 
-              (see doInterologWalk.pl for sample usage).
+ Argument  : -input_path : path to the input tsv file. A suitable input for this subroutine is the 
+             final output of the orthology walk pipeline (see doInterologWalk.pl for usage guidelines).
               input file should have .06out extension
-             -(OPTIONAL) score_path : path to  text file where scores will be saved one per row (useful for looking at score distributions 
-              eg through matlab)
+             -(OPTIONAL) score_path : path to  text file where scores will be saved one per row 
+              (useful for looking at score distributions eg through matlab)
               output textfile has a .scores extension 
-             -output_path : where you want the routine to write the data. Data is in TSV format. File extension is .07out
-             -term_graph :  a Go::Parser graph object obtained from parse_ontology() containing a network representation of the PSI-MI controlled 
-              vocabulary of terms.
+             -output_path : where you want the routine to write the data. Data is in TSV format. 
+              File extension is .07out
+             -term_graph :  a Go::Parser graph object obtained from parse_ontology() containing a 
+              network representation of the PSI-MI controlled vocabulary of terms.
              -meanscore_em : mean experimental method score for normalisation
              -meanscore_it : mean interaction type score for normalisation  
              -meanscore_dm : mean detection method score for normalisation   
              -meanscore_me_dm : mean 'multiple detection methods' score for normalisation
              -meanscore_me_taxa : mean 'multiple taxa' score for normalisation
-             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output during test. Default is 0.
+             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output during test. 
+              Default is 0.
  Throws    : -
  Comment   : -
 
@@ -2376,27 +2852,34 @@ sub compute_scores{
                                                   ds_number  => 3,    
                                                   datadir    => $path     
                                                   );
- Purpose   : Suppose you want to run an interolog walk starting from initial interactor X. You get a final putative interactor Y.
-             Now suppose the putative interactor is the output of more than an interolog walk, each one based 
-             on a interaction annotated in a different organism.
-             When building the score, we would like to account for the fact that a putative interaction obtained 
-             through interactions in multiple species is more reliable than one obtained through only one species.
-             In order to weight the Multiple_Taxa Score, however, a long procedure is required. It is not 
-             possible to use a mean taken from the direct Intact interactions data file, for obvious reasons. 
+ Purpose   : Suppose you want to run an interolog walk starting from initial interactor X. 
+             You get a final putative interactor Y.
+             Now suppose the putative interactor is the output of more than an interolog walk,
+             each one based on a interaction annotated in a different organism.
+             When building the score, we would like to account for the fact that a putative 
+             interaction obtained through interactions in multiple species is more reliable than 
+             one obtained through only one species. In order to weight the Multiple_Taxa Score, 
+             however, a long procedure is required. It is not possible to use a mean taken from 
+             the direct Intact interactions data file, for obvious reasons. 
              My solution can be currently summarised as follows:
              1. choose n<7 random taxa from a vector containing 7 well-supported NCBI taxa id;
              2. choose m (~500) random genes for each of the n taxa
-             3. run the full orthology walk using the methods from Bio::Homology::InterologWalk on each of the n datasets
+             3. run the full orthology walk using the methods from Bio::Homology::InterologWalk 
+                on each of the n datasets
              4. compute a mean_multiple taxa score for each of them
              5. Final Mean_Multiple_Taxa_Score = mean(M_1,M_2,M_3) 
-             The procedure is LONG and SLOW and might lead to Ensembl refusing connections in some instances.
- Returns   : the mean multiple taxa score, i.e. the global mean of the multiple taxa scores obtained for each random dataset
+             The procedure is LONG and SLOW and might lead to Ensembl refusing connections 
+             in some instances.
+ Returns   : the mean multiple taxa score, i.e. the global mean of the multiple taxa scores 
+             obtained for each random dataset
  Argument  : ds_size : number of ids per dataset, eg 500
-             ds_number : a number between 1 and 7, equal to the number of taxa to randomly pick from
+             ds_number : a number between 1 and 7, equal to the number of taxa to randomly 
+                         pick from
              datadir :  work directory
  Throws    : -
  Comment   : #TODO should randomised data be saved and reused?
-             Lots of hard coded stuff in here. Intact url is hard coded, etc. Need to review.
+             Lots of hard coded stuff in here. Intact url is hard coded, etc. 
+             Need to review.
 
 
 See Also   : 
@@ -2716,36 +3199,42 @@ use Carp qw(croak);
                                                       );
  Purpose   : This function  writes a .SIF file according to this cytoscape specification in:
              http://cytoscape.org/cgi-bin/moin.cgi/Cytoscape_User_Manual/Network_Formats.
-             For each input data row, the subroutine will extract the initial id, the (putative) PPI found, 
-             taxon information(optional), score (if present). 
+             For each input data row, the subroutine will extract the initial id, the 
+             (putative) PPI found, taxon information(optional), score (if present). 
              It will look up the ID pair on the Ensemble API and obtain gene names. 
              It will output a TSV file with .sif extension.
-             The routine can expand taxa information: it might be useful in some cases to know 
-             the taxon from which the putative PPI has been mapped
-             Eg.: instead of  A--B (default behaviour) one can decide to get A-mouse-B, A-human-B, A-fly-B, etc.
-             The routine should work both with a putative PPIs data file and with a direct interactions data file 
+             The routine can expand taxa information: it might be useful in some cases to 
+             know the taxon from which the putative PPI has been mapped
+             Eg.: instead of  A--B (default behaviour) one can decide to get A-mouse-B, 
+             A-human-B, A-fly-B, etc.
+             The routine should work both with a putative PPIs data file and with a direct
+             interactions data file 
              (it will look at the input file header to decide what it is dealing with).
  Returns   : success/ failure
- Argument  : -registry: ensembl registry object to connect to. Needed to retrieve up-to-date human readable gene names 
-              from Ensembl for the IDs in the input data file
-             -input_path : path to input file. Input file for this subroutine is a tsv file containing at least 
-              the fields INIT_ID and INTERACTOR.
-              (output of get_backward_orthologies() or get_direct_interactions will work, although output of 
-              remove_duplicate_rows() is recommended). 
-              Optionally, if interaction scores are desired, input fill will have to be the output of the 
-              scoring pipeline (see example file doScores.pl)
-             -output_path : where you want the routine to write the data. Data is a TSV .sif cytoscape file.
+ Argument  : -registry: ensembl registry object to connect to. Needed to retrieve up-to-date
+              human readable gene names from Ensembl for the IDs in the input data file
+             -input_path : path to input file. Input file for this subroutine is a tsv file 
+              containing at least the fields INIT_ID and INTERACTOR.
+              (output of get_backward_orthologies() or get_direct_interactions will work, 
+              although output of remove_duplicate_rows() is recommended). 
+              Optionally, if interaction scores are desired, input fill will have to be the 
+              output of the scoring pipeline (see example file doScores.pl)
+             -output_path : where you want the routine to write the data. Data is a TSV .sif 
+              cytoscape file.
              -source organism name (eg: "Mus musculus")
-             -(OPTIONAL) orthology_type: can be set to 'onetoone': if so, only entries obtained through "one to one" 
-              orthology projections will be 
-              retained in the output. Default: all orthologies retained.
-             -(OPTIONAL) expand_taxa: if true, information related to the species from which the putative PPI 
-              has been projected will be retained.
+             -(OPTIONAL) orthology_type: can be set to 'onetoone': if so, only entries 
+              obtained through "one to one" orthology projections will be retained in the output. 
+              Default: all orthologies retained.
+             -(OPTIONAL) expand_taxa: if true, information related to the species from which 
+              the putative PPI has been projected will be retained.
               if this is set to true, ensemb_db MUST also be set
-             -(OPTIONAL) ensembl_db: only required if expand_taxa is set. For allowed values, see get_forward_orthologies()
-             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output during test. Default is 0.
+             -(OPTIONAL) ensembl_db: only required if expand_taxa is set. For allowed values, 
+              see get_forward_orthologies()
+             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output during
+              test. Default is 0.
  Throws    : -
- Comment   : in order to account for the fact that the edges of the network are undirected (eg A-B = B-A), I can either
+ Comment   : in order to account for the fact that the edges of the network are undirected 
+             (eg A-B = B-A), I can either
              1) cache both couples (eg (A,B) and (B,A)) so I'll find them both when I look up
              2) do a lexicographic sorting before caching and before looking-up the cache
              I use the second option at the moment.
@@ -2976,20 +3465,26 @@ sub do_network{
                                                          label_type    => 'extname',
                                                          no_output      => 0
                                                          );
- Purpose   : This is needed to create a node attribute file to go with the .sif network created by do_networks(). 
+ Purpose   : This is needed to create a node attribute file to go with the .sif 
+             network created by do_networks(). 
              For a definition of node attribute file, see
              http://cytoscape.wodaklab.org/wiki/Cytoscape_User_Manual#Node_and_Edge_Attributes 
-             The routine associates, for each stable id in the sif file, a human-readable gene name/description obtained from Ensembl
+             The routine associates, for each stable id in the sif file, a human-readable 
+             gene name/description obtained from Ensembl
  Returns   : a boolean value for success/failure
- Argument  : -registry: ensembl registry object to connect to. Needed to retrieve up-to-date human readable gene names 
-              from Ensembl for the IDs in the input data file
-             -input_path : path to input file. Input file for this subroutine is a tsv file containing at least the fields INIT_ID and INTERACTOR.
-              (output of get_backward_orthologies() or get_direct_interactions will work, although output of remove_duplicate_rows() is recommended). 
-             -output_path : where you want the routine to write the data. Data is a .noa cytoscape file.
+ Argument  : -registry: ensembl registry object to connect to. Needed to retrieve up-to-date
+              human readable gene names from Ensembl for the IDs in the input data file
+             -input_path : path to input file. Input file for this subroutine is a tsv file 
+              containing at least the fields INIT_ID and INTERACTOR.
+              (output of get_backward_orthologies() or get_direct_interactions will work, 
+              although output of remove_duplicate_rows() is recommended). 
+             -output_path : where you want the routine to write the data. Data is a .noa 
+              cytoscape file.
              -source_org : source organism name (eg: "Mus musculus")
-             -(OPTIONAL) label_type: what kind of human readable string to employ. Options are 'extname' (external name) and 'description'. Default
-              is 'extname'
-             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output during test. Default is 0.
+             -(OPTIONAL) label_type: what kind of human readable string to employ. Options 
+              are 'extname' (external name) and 'description'. Default is 'extname'
+             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output 
+              during test. Default is 0.
  Throws    : -
  Comment   : -
 
@@ -3333,44 +3828,57 @@ sub _is_primary_id {
                                                                  physical_only   => 1, 
                                                                  no_output       => 0 
                                                                  );
- Purpose   : this methods allows  to query the Intact database using the REST interface. IntAct is the Molecular Interaction database 
-             at the European Bioinformatics Institute (UK).
-             The Intact project offers programmatic access to their data through the PSICQUIC specification 
-             (see http://code.google.com/p/psicquic/wiki/PsicquicSpecification).
-             This routine is different and more complex than get_interactions() from the main module. 
-             This one is meant to query intact directly with the ids provided by the user: no intermediate orthologues 
-             from ensembl are collected.
-             The bulk of the script is used for the following reason: each query to intact through psicquic returns 
-             a data entry including a binary protein interaction, and the the two ids returned are uniprotkb or other protein ids. 
+ Purpose   : this methods allows  to query the Intact database using the REST interface. 
+             IntAct is the Molecular Interaction database at the European Bioinformatics 
+             Institute (UK). The Intact project offers programmatic access to their data 
+             through the PSICQUIC specification (see 
+             http://code.google.com/p/psicquic/wiki/PsicquicSpecification).
+             This routine is different and more complex than get_interactions() from the 
+             main module. This one is meant to query intact directly with the ids provided 
+             by the user: no intermediate orthologues from ensembl are collected.
+             The bulk of the script is used for the following reason: each query to intact 
+             through psicquic returns a data entry including a binary protein interaction, 
+             and the the two ids returned are uniprotkb or other protein ids. 
              We need to
                 a- convert both to a format recognised by ensembl
                 b- identify which of the two corresponds to our initial id
                 c- convert the other one to ensembl and store it in the file
-             This conversion is not trivial as the possibility of ambiguities/errors/wrong matches between ensembl gene 
-             representations and uniprot protein representations is high.
+             This conversion is not trivial as the possibility of ambiguities/errors/wrong 
+             matches between ensembl gene representations and uniprot protein representations 
+             is high.
  Returns   : return code for error/success 
  Argument  : -registry: registry object to connect to Ensembl
              -source_org : source organism name (eg: "Mus musculus")
-             -input_path : path to input file. Input file MUST be a text file with one entry per row, each entry containing an up-to-date
-              gene ID recognised by the Ensembl consortium (http://www.ensembl.org/) followed by a new line char.
+             -input_path : path to input file. Input file MUST be a text file with one entry 
+              per row, each entry containing an up-to-date
+              gene ID recognised by the Ensembl consortium (http://www.ensembl.org/) followed 
+              by a new line char.
              -output_path : where you want the routine to write the data. Data is in TSV format.
              -url : url for the REST service to query (currently only EBI Intact PSICQUIC Rest)
-             -(OPTIONAL) check_ids : if true, every interactor id found in intact data will be double checked against ensembl.
-              this is useful because intact dbs sometimes contain obsolete versions of some ids. However
-              chosing true will significantly slow down the processing
-             -(OPTIONAL) no_spoke: if set, interactions obtained from the expansion of complexes through the SPOKE method 
+             -(OPTIONAL) check_ids : if true, every interactor id found in intact data will 
+              be double checked against ensembl.
+              this is useful because intact dbs sometimes contain obsolete versions of some 
+              ids. However chosing true will significantly slow down the processing
+             -(OPTIONAL) no_spoke: if set, interactions obtained from the expansion of 
+               complexes through the SPOKE method 
               (see http://nar.oxfordjournals.org/cgi/content/full/38/suppl_1/D525)
               will be ignored
-             -(OPTIONAL) exp_only: if set, only interactions whose MITAB25 field "Interaction Detection Method" 
-              (MI:0001 in the PSI-MI controlled vocabulary) is at least "experimental interaction detection" 
-              (MI:0045 in the PSI-MI controlled vocabulary) will be retained. I.e. if set, this flag only allows 
+             -(OPTIONAL) exp_only: if set, only interactions whose MITAB25 field 
+              "Interaction Detection Method" 
+              (MI:0001 in the PSI-MI controlled vocabulary) is at least "experimental 
+              interaction detection" 
+              (MI:0045 in the PSI-MI controlled vocabulary) will be retained. I.e. if set, 
+              this flag only allows 
               experimentally detected interactions to be retained and stored in the data file
-             -(OPTIONAL) physical_only: if set, only interactions whose MITAB25 field "Interaction Type" 
+             -(OPTIONAL) physical_only: if set, only interactions whose MITAB25 field 
+              "Interaction Type" 
               (MI:0190 in the PSI-MI controlled vocabulary) is at least "physical association" 
-              (MI:0915 in the PSI-MI controlled vocabulary) will be retained. I.e. if set, this flag only allows 
-              physically associated PPIs to be retained and stored in the data file: colocalizations and
-              genetic interactions will be discarded
-             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output during test. Default is 0.
+              (MI:0915 in the PSI-MI controlled vocabulary) will be retained. I.e. 
+              if set, this flag only allows 
+              physically associated PPIs to be retained and stored in the data file: 
+              colocalizations and genetic interactions will be discarded
+             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output 
+              during test. Default is 0.
  Throws    : -
  Comment   : -
 
@@ -3628,371 +4136,15 @@ sub get_direct_interactions{
 }
 
 
+##################secondary pod documentation begins##############
 
-#################### main pod documentation begins ###################
-
-=head1 NAME
-
-Bio::Homology::InterologWalk - Retrieve, score and visualize putative Protein-Protein Interactions through the orthology-walk method
-
-=head1 VERSION
-
-This document describes version 0.01 of Bio::Homology::InterologWalk released August 30th, 2010
-
-=head1 SYNOPSIS
-
-  use Bio::Homology::InterologWalk;
-
-First, obtain Intact Interactions for the dataset (see example in C<getDirectInteractions.pl>):
-
-
-  #get a registry from Ensembl
-  my $registry = Bio::Homology::InterologWalk::setup_ensembl_adaptor(
-                                                     connect_to_db  => $ensembl_db,
-                                                     source_org     => $sourceorg,
-                                                     verbose        => 1
-                                                     );
-  
-  
-  #query direct interactions
-  $RC = Bio::Homology::InterologWalk::Direct::get_direct_interactions(
-                                                      registry         => $registry,
-                                                      source_org       => $sourceorg,
-                                                      input_path       => $in_path,
-                                                      output_path      => $out_path,
-                                                      url              => $url,
-                                                      );
-
-
-
-
-do some postprocessing (see L</do_counts> and L</extract_unseen_ids> ) and then run the actual interolog walk on the dataset
-with the following sequence of three methods.
-
-
-get orthologues of starting set:
-
-  $RC = Bio::Homology::InterologWalk::get_forward_orthologies(
-                                              registry        => $registry,
-                                              ensembl_db      => $ensembl_db,
-                                              input_path      => $in_path,
-                                              output_path     => $out_path,
-                                              source_org      => $sourceorg,
-                                              dest_org        => $destorg,
-                                              );
-
-
-
-add interactors of  orthologues found by C<get_forward_orthologies()>:
-
-
-
-  $RC = Bio::Homology::InterologWalk::get_interactions(
-                                       input_path    => $in_path,
-                                       output_path   => $out_path,
-                                       url           => $url,
-                                       );
-
-
-add orthologues of interactors found by C<get_interactions()>:
-
-  $RC = Bio::Homology::InterologWalk::get_backward_orthologies(
-                                               registry    => $registry,
-                                               ensembl_db  => $ensembl_db,
-                                               input_path  => $in_path,
-                                               output_path => $out_path,
-                                               error_path  => $err_path,
-                                               source_org  => $sourceorg,  
-                                               );
-
-do some postprocessing (see L</remove_duplicate_rows>, L</do_counts>, L</extract_unseen_ids>)
-and then optionally compute a composite score
-for the putative interactions obtained:
-
-  $RC = Bio::Homology::InterologWalk::Scores::compute_scores(
-                                             input_path        => $in_path,
-                                             score_path        => $score_path,
-                                             output_path       => $out_path,
-                                             term_graph        => $onto_graph,
-                                             meanscore_it      => $m_it,
-                                             meanscore_dm      => $m_dm,
-                                             meanscore_me_dm   => $m_mdm,
-                                             meanscore_me_taxa => $m_mtaxa
-                                             );
-
-
-get some networks and network attributes which you can then visualise with cytoscape
-
-   $RC = Bio::Homology::InterologWalk::Networks::do_network(
-                                            registry        => $registry,
-                                            input_path      => $in_path,
-                                            output_path     => $out_path,
-                                            source_org      => $sourceorg
-                                            );
-                                               
-   $RC = Bio::Homology::InterologWalk::Networks::do_attributes(
-                                               registry      => $registry,
-                                               input_path    => $in_path,
-                                               output_path   => $out_path,
-                                               source_org    => $sourceorg,
-                                               label_type    => 'external name'
-                                               );
-
-I<The synopsis above only lists the major methods and parameters.>
-
-=head1 DESCRIPTION
-
-A common activity in computational biology is to mine protein-protein interactions 
-from publicly available databases to build I<Protein-Protein Interaction> (PPI) datasets.  
-In many instances, however, the number of experimentally obtained annotated PPIs is very scarce
-and it would be helpful to enrich the experimental dataset with high-quality, computationally-inferred PPIs.
-Such computationally-obtained dataset can extend, support or enrich experimental PPI datasets, and are
-of crucial importance in high-throughput gene prioritization studies, i.e. to drive hypotheses and restrict the
-dimensionality of functional discovery problems.
-This Perl Module, C<Bio::Homology::InterologWalk>, is aimed at building 
-putative PPI datasets on the basis of  a number of comparative biology paradigms: the module implements 
-a collection of computational biology algorithms based on the concept of "orthology projection". 
-If interacting proteins A and B in organism X have orthologues A' and B' in organism Y, under certain
-conditions one can assume that the interaction will be conserved in organism Y, i.e. the A-B 
-interaction can be "projected through the orthologies" to obtain a putative A'-B' interaction.
-The pair of interactions (A-B) and (A'-B') are named "Interologs".
-
-
-
-C<Bio::Homology::InterologWalk> collects, analyses and collates gene orthology data
-provided by the Ensembl Consortium as well as PPI data provided by
-EBI Intact. It provides the user with the possibility of rating the quality and reliability of 
-the putative interactions collected by means of  confidence scores,
-and optionally outputs network representations of the datasets, 
-compatible with the biological network representation standard, Cytoscape.
-
-=head1 USAGE
-
-=head2 Rationale
-
-
-                              \EBI Intact API/
-         .--------------.            |             .-------------.
-     (2) | A(e.g. mouse)|<------------------------>|   B(mouse)  |  (3)
-         `--------------'          <PPI>           `-------------'
-                ^                                         |
-   /Ensembl\    | <Orthology>                 <Orthology> | \ Ensembl /
-  / Compara \   |                                         |  \Compara/
- /    Api    \  |                                         |   \ Api /
-                |                                         | 
-         .--------------.                           .-------------.
-     (1) | A'(e.g. fly) |. . . . . . . . . . . . .  |   B'(fly)   | (4)
-         `--------------'     [SCORED]PUTATIVE PPI  `-------------'
-                    (Output of Bio::Homology::InterologWalk)
-
-
-In order to carry out an interolog walk we start with a set of gene identifiers in one organism of interest (1).
-We query those ids against a number of comparative biology  databases to retrieve a list of orthologues for the
-gene ids of interest, in one or more species (2). In the next step we rely instead on PPI databases 
-to retrieve the list of available interactors for the protein ids obtained in (2). The output at this stage consists of
-a list of interactors of the orthologues of the initial gene set, plus several fields of ancillary data (whose importance will
-be explained later) (3). 
-In the last step of the process we will need to project the interactions in (3) - again using orthology data - back
-to the original species of interest. 
-The final output is a list of B<putative interactors> for the initial gene set, plus several
-fields of supporting data. 
-
-C<Bio::Homology::InterologWalk> provides three main functions to carry out the basic walk, C<get_forward_orthologies()> , C<get_interactions()> and  
-C<get_backward_orthologies()>. These functions must be called strictly in sequential order in the user's script, as they process, analyse and attach data to the output 
-in a pipeline-like fashion, i.e. working on the output of the preceding function.
-
-
-=over 4
-
-=item  get_forward_orthologies
-
-This methods queries the initial gene list against one or more Ensembl DBs (using the Ensembl Perl API) and retrieves their orthologues, 
-plus a number of ancillary data fields ( conservation data, distance from ancestor, orthology type, etc) 
-
-=item get_interactions
-
-This queries the orthology list built in the previous stage against PSICQUIC-enabled PPI DBs using Rest. 
-This step will enrich the dataset built through C<get_forward_orthologies> with the interactors of those orthologues, if any, plus ancillary data (including several
-parameters describing the quality, nature and origin of the annotated interaction).
-
-=item get_backward_orthologies
-
-This queries the interactor list built in the previous stage against one or more Ensembl DBs (again  using the Ensembl Perl API)
-to find orthologues back in the original species of interest. It will also adds a number of supplementary information fields, specularly to what done in C<get_forward_orthologies>.  
-
-=back
-
-The output of this sequence of subroutines will be a TSV file containing zero or more entries, closely resembling  the MITAB tab delimited data exchange format from the  HUPO PSI (Proteomics Standards Initiative).
-Each row in the data file represents a binary putative interaction, plus currently 37 supplementary data fields.
-
-This basic output can then be further processed with the help of other methods in the module: one can scan the results to compute counts, 
-to check for duplicates, to verify the presence of new gene ids that were not present in the original dataset and save them in another datafile, and so on.
-
-Most importantly, the user could need to further process the putative PPIs dataset to do one or more of the following:
-
-
-=over
-
-=item 1.
-
-Compute a global confidence score to obtain a metric for the reliability of the each binary putative interaction
-
-=item 2.
-
-Extract the binary putative PPIs from the dataset and save them in a format compatible with Cytoscape. This helps providing a visual quality to the result as 
-one could then apply network analysis tools to discover motifs, clusters, well-connected subnetworks, look for GO functional enrichment, and more. 
-The format chosen for the network representation of the dataset is currently C<.sif>. (see http://cytoscape.wodaklab.org/wiki/Cytoscape_User_Manual#Supported_Network_File_Formats) 
-The generation of node attributes is also possible, to allow for visualisation of node tags in terms of simpler human readable labels instead of database IDs.
-
-=item 3.
-
-Obtain a dataset of experimental/direct PPIs (i.e. just plain interactors, 
-no orthology mapping across other taxa involved) from the gene list used as the input to the orthology walk. The reasons why this might be useful are several. 
-The user might want to compare this dataset with the putative PPI dataset also generated by the module to see if/where the two overlap, 
-what is the intersection/difference set, and more. See L</get_direct_interactions> for documentation relative to this function. Please also notice a dataset of 
-direct interactions will also be pre-requisite if the user intends to compute confidence values for the putative PPI dataset: the direct PPI dataset is required to
-compute score normalisation means.
-
-=back
-
-
-=head1 EXAMPLES
-
-In order to demonstrate one way of using the module, four example perl scripts are provided in the C<scripts/Code> directory. 
-Each sample script utilises the module and uses/reuses subroutines in a pipeline fashion. The workflow suggested with the scripts is as follows:
-
-B<User Input>: a textfile containing one gene ID per row. All gene IDs must belong to the same species. All gene IDs must be current Ensembl gene IDs.
-
-
-=over
-
-=item 1. B<Mine Direct Interactions.>
-
-Generate a dataset of direct PPIs based on the input ID list. See example in C<getDirectInteractions.pl>
-
-=item 2. B<Run the basic Interolog-Walk Pipeline.>
-
-Generate dataset of projected putative PPIs following the paradigm explained earlier. Do some postprocessing on the dataset. See example in C<doInterologWalk.pl>
-
-=item 3. B<Compute confidence scores for putative PPIs.>
-
-Score the dataset obtained in (2.) using the dataset obtained in (1.) to normalise the score components values. See example in C<doScores.pl>
-
-=item 4. B<Extract network and attributes for the two PPI datasets.>
-
-For each of the two datasets obtained from (1) and (2) (putative PPIs) or from (1) and (3) (scored putative PPIs) extract a text file containing a network representation and 
-a text file of node attributes. 
-
-See example in C<doNets.pl>
-
-=back
-
-
-=head1 DEPENDENCIES 
-
-C<Bio::Homology::InterologWalk> relies on the following prerequisite packages.
-
-=head2 Ensembl API
-
-The Ensembl project is currently branched in two sub-projects:
-
-=over
-
-=item The Ensembl Vertebrates project 
-
-This is of interest to you if you work with vertebrate genomes (although it also includes data from a few non-vertebrate common model organisms).
-See http://www.ensembl.org/index.html for further details.
-
-=item The Ensembl Genomes project 
-
-This utilises the Ensembl software infrastructure (originally developed in the Ensembl Core project) to provide 
-access to genome-scale data from non-vertebrate species. This is of interest to you if your species  is a non-vertebrate, or if
-your species  is a vertebrate but you I<also want to obtain results mapped from non-vertebrates>. C<Bio::Homology::InterologWalk> currently only supports
-the B<metazoa> sub-site from the Ensembl Genomes Project. See http://metazoa.ensembl.org/index.html for further details.
-
-=back 
-
-
-
-B<IMPORTANT> You will need to decide which Ensembl-DB set you will need B<prior> to installing C<Bio::Homology::InterologWalk>.  
-The module requests that 
-
-Ensembl API Version == Ensembl-DB set version. 
-
-This means that if you install e.g. API V.58, 
-you will only be able to get data from Ensembl Vertebrates / Metazoa databases V. 58. As the EnsemblGenomes DB releases are 
-B<one version behind> the Ensembl Vertebrate DB release, if you install the bleeding-edge Ensembl Vertebrate API, I<a matching EnsemblGenomes DB release might
-not be available yet>: you will still be able to use C<Bio::Homology::InterologWalk> to run an orthology walk using exclusively Ensembl Vertebrate DBs, but you
-will get an error if you try to choose metazoan databases. See L</setup_ensembl_adaptor> for further information.
-
-
-Therefore, before installing C<Bio::Homology::InterologWalk>, you are faced with the following choice: 
-
-=over
-
-=item a)
-
-If you are exclusively interested in B<vertebrates> (plus the few
-non-vertebrate model organisms still present in Ensembl Vertebrates) then obtain the APIs and
-set up the environment by following the steps described on the Ensembl Vertebrates API installation pages:
-
-http://www.ensembl.org/info/docs/api/api_installation.html
-
-or alternatively
-
-http://www.ensembl.org/info/docs/api/api_cvs.html
-
-This option allows you to get the B<most recent> datasets provided by Ensembl Core. However, you might not be able to query EnsemblCompara data.
-
-=item b) 
-
-If you are interested in querying/getting back data from vertebrate + metazoan genomes, then obtain the APIs
-and set up the environment by following the steps described on the Ensembl Metazoa API installation pages: 
-(this allows you to query across a wider selection of taxa)
-
-http://metazoa.ensembl.org/info/docs/api/api_installation.html
-
-or alternatively
-
-http://metazoa.ensembl.org/info/docs/api/api_cvs.html
-
-This option will probably not use the most recent API+DBs, but will guarantee functionality across both Vertebrate and Metazoan genomes.
-
-=back
-
-Option (b) is the B<recommended> one.
-
-NOTE 1: All the API components  (C<ensembl>, C<ensembl-compara>, C<ensembl-variation>, C<ensembl-functgenomics>) are required.
-
-NOTE 2: The module has been tested on Ensembl Vertebrates API & DB v. 58 and v. 59 and EnsemblGenomes API & DB  v. 5 (58). 
-
-=head2 Bioperl
-
-Ensembl provides a customised Bioperl installation tailored to its API, v. 1.2.3. 
-Should version 1.2.3 be no more available through Ensembl, please obtain release 1.6.x from CPAN. (while not officially supported by the
-Ensembl Project it will work fine when using the API within the scope of the present module)
-
-=head2 Additional Perl Modules
-
-The following modules (including all dependencies) from CPAN are also required:
-
-=over
-
-=item 1. C<REST::Client>
-
-=item 2. C<GO::Parser>
-
-=item 3. C<DBD::CSV> (requires Perl DBI)
-
-=item 4. C<String::Approx>
-
-=back
-
-I<See the README file for further information.>
 
 =head1 BUGS AND LIMITATIONS
 
-Please report any you find, bug reports and other feedback are most welcome. 
+This is B<ALPHA> software. There will be bugs. The interface may change. Please be careful. Do not rely on it for anything mission-critical.
+
+
+Please report any bugs you find, bug reports and any other feedback are most welcome. 
 
 -Currently only the  EBI Intact DB is available for PPI retrieval. This will be expanded to account for  all available PSICQUIC-compliant PPI dbs transparently. 
 This includes MINT, STRING, BioGrid and many more. For a full list of compliant DBs and for the status of the PSICQUIC service, check
@@ -4039,8 +4191,7 @@ Dave Messina, BioPerl list
 
 =cut
 
-#################### main pod documentation end ###################
-
+#################### secondary pod documentation end ###################
 
 1;
 # The preceding line will help the module return a true value

@@ -1,5 +1,8 @@
 Revision history for Perl extension Bio::Homology::InterologWalk.
 
+0.02  Tue Aug 31 09:51:26 2010
+        - POD reformatted
+
 0.01  Sun Aug 29 19:09:26 2010
 	- original version; created by h2xs 1.23 with options
 		-XA -n Bio::Homology::InterologWalk

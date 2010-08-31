@@ -1,7 +1,7 @@
-Bio-Homology-InterologWalk version 0.01
+Bio-Homology-InterologWalk version 0.02
 =======================================
 
-This document refers to version 0.01 of Bio::Homology::InterologWalk.
+This document refers to version 0.02 of Bio::Homology::InterologWalk.
 This version was released August 31st, 2010.
 
 INSTALLATION-------------------------------------------------------------------------
@@ -9,9 +9,9 @@ INSTALLATION--------------------------------------------------------------------
 To install this module on your system, place the tarball archive file in a 
 temporary directory and call the following:
 
-% gunzip Bio-Homology-InterologWalk-0.01.tar.gz
-% tar xf Bio-Homology-InterologWalk-0.01.tar
-% cd Bio-Homology-InterologWalk-0.01
+% gunzip Bio-Homology-InterologWalk-0.02.tar.gz
+% tar xf Bio-Homology-InterologWalk-0.02.tar
+% cd Bio-Homology-InterologWalk-0.02
 % perl Makefile.PL
 % make
 % make test
@@ -141,22 +141,18 @@ SAMPLE SCRIPS-------------------------------------------------------------------
 The scripts/Code sub-directory provide an example for the usage of 
 the module. The meaning of the files is as follows:
 
--doInterologWalk.pl:        example usage of the core methods: given a flat file containing a list of stable flybase ids, this script will use Bio::Homology::InterologWalk
-                            to build a TSV file containing the putative interactors of such ids according to the interolog mapping method.
+-doInterologWalk.pl:  example usage of the core methods: given a flat file containing a list of stable flybase ids, this script will use Bio::Homology::InterologWalk to build a TSV file containing the putative interactors of such ids according to the interolog mapping method.
 
 -getDirectInteractions.pl:  generate a dataset of direct PPIs based on the input ID list
 
--doScores.pl:               given a tsv obtained with doInterologWalk.pl, this file will compute an aggregated score for each (id, putative interactor) couple, representing a measure
-                            of the reliability of the interaction. The output of this script is a new TSV file containing a new compound score column
+-doScores.pl:  given a tsv obtained with doInterologWalk.pl, this file will compute an aggregated score for each (id, putative interactor) couple, representing a measure of the reliability of the interaction. The output of this script is a new TSV file containing a new compound score column
                             
-                            REQUIRES: doInterologWalk.pl getDirectInteractions.pl
+REQUIRES: doInterologWalk.pl getDirectInteractions.pl
 
--doNets.pl                  given a tsv obtained from doFlyWalk.pl (optionally, processed by doScores.pl to add a compound score column) this script will produce a .sif network file and 
-                            a .noa network attribute file, suitable for importing into the Cytoscape (http://www.cytoscape.org/) network visualisation program. The two files follow the definition 
-                            on page http://cytoscape.org/cgi-bin/moin.cgi/Cytoscape_User_Manual/Network_Formats and have been tested on Cytoscape v. 2.6.2 / 2.6.3
-                            
-                            REQUIRES: doInterologWalk.pl
-                            OPTIONAL: doScores.pl
+-doNets.pl:    given a tsv obtained from doFlyWalk.pl (optionally, processed by doScores.pl to add a compound score column) this script will produce a .sif network file and a .noa network attribute file, suitable for importing into the Cytoscape (http://www.cytoscape.org/) network visualisation program. The two files follow the definition on page http://cytoscape.org/cgi-bin/moin.cgi/Cytoscape_User_Manual/Network_Formats and have been tested on Cytoscape v. 2.6.2 / 2.6.3
+
+REQUIRES: doInterologWalk.pl
+OPTIONAL: doScores.pl
 
 scripts/Data      contains a psi-mi obo ontology (used by doScores.pl interaction types and 
                   interaction detection methods) and a small sample Mus musculus dataset. 
