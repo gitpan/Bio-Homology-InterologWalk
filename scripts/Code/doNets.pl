@@ -33,11 +33,14 @@ GetOptions(
 );
 
 #filenames and CLAs===============================================
-if ( !$infilename ) {
-    $infilename = "R58_mmus_test.06out";
-    print "doNets.pl: no filename specified..Trying default: $infilename\n";
-}
-else {
+if ( !$infilename ){
+     print "\n";
+     print "USAGE perl doNets.pl -filename='<yourfile>.07out' -sourceorg='Mus musculus'\n";
+     print "if you have scored your results, or\n";
+     print "USAGE perl doNets.pl -filename='<yourfile>.06out' -sourceorg='Mus musculus'\n";
+     print "if you have NOT scored your results.\n\n";
+     exit;
+}else {
     print "doNets.pl: Using input file: $infilename\n";
 }
 
@@ -53,8 +56,7 @@ else {
       "doNets.pl: input file seems to be a putative-interactions data file..\n";
     if ( !$orthtype ) {
         $orthtype = "allortho";
-        print
-"doNets.pl: no orthology class specified..Using default: $orthtype..\n";
+        print "doNets.pl: no orthology class specified..Using default: $orthtype..\n";
     }
     else {
         print "doNets.pl: Querying orthology class: $orthtype.\n";
@@ -65,8 +67,7 @@ if ( !$sourceorg ) {    #then use some default
     #$sourceorg = "Drosophila melanogaster";
     $sourceorg = "Mus musculus";
     #$sourceorg = 'Caenorhabditis elegans';
-    print
-      "doNets.pl: no source organism specified..Using default: $sourceorg\n";
+    print "doNets.pl: no source organism specified..Using default: $sourceorg\n";
 }
 else {
     print "doNets.pl: Using source organism: $sourceorg.\n";

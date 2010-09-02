@@ -1,6 +1,6 @@
 package Bio::Homology::InterologWalk;
 
-use 5.010001;
+use 5.008006;
 use strict;
 use warnings;
 
@@ -19,7 +19,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 
 

@@ -27,22 +27,24 @@ my $work_dir = '../Data/';
 my $infilename; #actual dataset to score
 my $intactfile; #direct interactions obtained with getDirectInteractions.pl
 my $psimi_ont; #psi mi obo ontology from HUPO. See http://www.psidev.info/index.php?q=node/277
-GetOptions( 'tsvfile=s'     => \$infilename,
+GetOptions( 
+            'tsvfile=s'     => \$infilename,
             'intactfile=s'  => \$intactfile,
-            'ontology=s'    => \$psimi_ont);
+            'ontology=s'    => \$psimi_ont
+          );
 
 #filenames and files===============================================
-if ( !$infilename ) {
-    $infilename = 'R58_mmus_test.06out';
-    print "doScores.pl: no filename specified..Trying default: $infilename\n";
+if( !$infilename ){
+    print "\nUSAGE perl doScores.pl -tsvfile='<yourfile>.06out' -intactfile='<yourfile>.direct.02'\n";
+    exit;
 }
+if(!$intactfile){
+    print "\nUSAGE perl doScores.pl -tsvfile='<yourfile>.06out' -intactfile='<yourfile>.direct.02'\n";
+    exit;
+}
+
 $in_path = $work_dir . $infilename;
 $infilename =~ s/(.*)\..*/$1/;
-
-if ( !$intactfile ) {
-     $intactfile = 'R58_mmus_test.direct.02';
-     print "doScores.pl: no Intact direct interaction filename specified..Trying default: $intactfile\n";
-}
 my $intact_path = $work_dir . $intactfile;
 
 if ( !$psimi_ont ) {
@@ -66,9 +68,11 @@ $score_path = $work_dir . $score_filename;
 #==================================================================
 #WARNING: this might take a long time
 $m_mtaxa = Bio::Homology::InterologWalk::Scores::compute_multiple_taxa_mean(
-                                                            ds_size   => 10,          #number of ids per dataset, eg 500
-                                                            ds_number => 2,           #max is 7, equal to the number of taxa
-                                                            datadir   => $work_dir    #for the path
+                                                            ds_size   => 10,          
+                                                            #size: ideally it should be comparable to the dataset size
+                                                            ds_number => 3,           
+                                                            #max is currently 7, equal to the number of taxa with significant amount of data
+                                                            datadir   => $work_dir
                                                             );
 if ( !$m_mtaxa ) {
     print "There were errors. Stopping..\n";

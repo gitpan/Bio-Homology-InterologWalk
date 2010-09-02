@@ -26,10 +26,12 @@ my $infilename;
 my $sourceorg;
 my $destorg;
 my $onetoone;
-GetOptions('filename=s'=>\$infilename,
-           'sourceorg=s'=>\$sourceorg,
-           'destorg=s'=>\$destorg,
-           'onetoone!'=>\$onetoone);
+GetOptions(
+           'filename=s'  =>\$infilename,
+           'sourceorg=s' =>\$sourceorg,
+           'destorg=s'   =>\$destorg,
+           'onetoone!'   =>\$onetoone
+          );
 
 #filenames and files===============================================
 if(!$infilename){
@@ -78,7 +80,8 @@ $out_path = $work_dir . $out_filename;
 my $ensembl_db = 'all';
 
 #1) set up the Ensembl compara connection
-my $registry = Bio::Homology::InterologWalk::setup_ensembl_adaptor(connect_to_db    => $ensembl_db,
+my $registry = Bio::Homology::InterologWalk::setup_ensembl_adaptor(
+                                                   connect_to_db    => $ensembl_db,
                                                    source_org       => $sourceorg,
                                                    dest_org         => $destorg,
                                                    #verbose         => 1

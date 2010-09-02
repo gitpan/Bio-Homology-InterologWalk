@@ -1,17 +1,17 @@
-Bio-Homology-InterologWalk version 0.02
+Bio-Homology-InterologWalk version 0.03
 =======================================
 
-This document refers to version 0.02 of Bio::Homology::InterologWalk.
-This version was released August 31st, 2010.
+This document refers to version 0.03 of Bio::Homology::InterologWalk.
+This version was released September 2nd, 2010.
 
 INSTALLATION-------------------------------------------------------------------------
 
 To install this module on your system, place the tarball archive file in a 
 temporary directory and call the following:
 
-% gunzip Bio-Homology-InterologWalk-0.02.tar.gz
-% tar xf Bio-Homology-InterologWalk-0.02.tar
-% cd Bio-Homology-InterologWalk-0.02
+% gunzip Bio-Homology-InterologWalk-0.03.tar.gz
+% tar xf Bio-Homology-InterologWalk-0.03.tar
+% cd Bio-Homology-InterologWalk-0.03
 % perl Makefile.PL
 % make
 % make test
@@ -136,6 +136,15 @@ You will also need to install the following modules (including all dependencies)
 4. String::Approx
 5. List::Util
 6. File::Glob
+
+=====================
+4. NOTE FOR MAC USERS
+=====================
+Please notice that Ensembl REQUIRES the module DBD::MySQL in order to work.
+DBD::MySQL in turn will need to contact a running instance of MySQL in 
+order to successfully complete the "make test" stage. Please check
+http://www.ensembl.org/info/docs/api/api_installation.html
+for further information. 
 
 SAMPLE SCRIPS--------------------------------------------------------------------------------
 The scripts/Code sub-directory provide an example for the usage of 

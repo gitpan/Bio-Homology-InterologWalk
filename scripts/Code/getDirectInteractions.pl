@@ -28,7 +28,7 @@ GetOptions('filename=s'=>\$infilename,
            'sourceorg=s'=>\$sourceorg);
 #filenames and files===============================================
 if(!$infilename){
-     $infilename = 'prova.txt';
+     $infilename = 'mmus_test.txt';
      print "getDirectInteractions.pl: No filename specified..Trying default..$infilename\n";
 }else{
      print "getDirectInteractions.pl: using input file: $infilename\n";

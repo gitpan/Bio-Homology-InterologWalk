@@ -1,4 +1,4 @@
-use 5.010001;
+use 5.008006;
 use ExtUtils::MakeMaker;
 
 WriteMakefile(
@@ -9,7 +9,6 @@ WriteMakefile(
                 Bio::EnsEMBL::Registry     => 0,
 		GO::Parser                 => 0,
 		REST::Client               => 0,
-		DBI                        => 0,
 		DBD::CSV                   => 0,
 		String::Approx             => 0,
 		List::Util                 => 0,

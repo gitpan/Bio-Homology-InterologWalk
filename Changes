@@ -1,5 +1,15 @@
 Revision history for Perl extension Bio::Homology::InterologWalk.
 
+
+0.03  Thu Sep 02 15:42:09 2010
+        - Relaxed Perl Version Requirement to 5.8.6
+        - fixed input namefile bug in getDirectInteractions.pl
+        - Removed DBI requirement (implicitly required by DBD::CSV)
+        - included MAC note in README
+        - changed arguments in compute_multiple_taxa_mean() in doScores.pl
+        - included "usage" conditions in doScores.pl and doNets.pl. No "default" filename anymore:
+          ensembl version in filename is dynamic, it would have broken soon.
+
 0.02  Tue Aug 31 09:51:26 2010
         - POD reformatted
 
