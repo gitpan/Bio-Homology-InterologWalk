@@ -1,7 +1,6 @@
 use strict;
 use warnings;
 use Test::More tests => 19;
-use lib '/home/giuseppe/workspace/orthologyTransferModules/Modules';
 use Bio::Homology::InterologWalk;
 
 my $sourceorg = 'Mus musculus';
