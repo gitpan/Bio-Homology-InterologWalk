@@ -1,17 +1,17 @@
-Bio-Homology-InterologWalk version 0.04
+Bio-Homology-InterologWalk version 0.05
 =======================================
 
-This document refers to version 0.04 of Bio::Homology::InterologWalk.
-This version was released September 3rd, 2010.
+This document refers to version 0.05 of Bio::Homology::InterologWalk.
+This version was released September 9th, 2010.
 
 INSTALLATION-------------------------------------------------------------------------
 
 To install this module on your system, place the tarball archive file in a 
 temporary directory and call the following:
 
-% gunzip Bio-Homology-InterologWalk-0.04.tar.gz
-% tar xf Bio-Homology-InterologWalk-0.04.tar
-% cd Bio-Homology-InterologWalk-0.04
+% gunzip Bio-Homology-InterologWalk-0.05.tar.gz
+% tar xf Bio-Homology-InterologWalk-0.05.tar
+% cd Bio-Homology-InterologWalk-0.05
 % perl Makefile.PL
 % make
 % make test
@@ -158,7 +158,7 @@ the module. The meaning of the files is as follows:
                             
 REQUIRES: doInterologWalk.pl getDirectInteractions.pl
 
--doNets.pl:    given a tsv obtained from doFlyWalk.pl (optionally, processed by doScores.pl to add a compound score column) this script will produce a .sif network file and a .noa network attribute file, suitable for importing into the Cytoscape (http://www.cytoscape.org/) network visualisation program. The two files follow the definition on page http://cytoscape.org/cgi-bin/moin.cgi/Cytoscape_User_Manual/Network_Formats and have been tested on Cytoscape v. 2.6.2 / 2.6.3
+-doNets.pl:    given a tsv obtained from doFlyWalk.pl (optionally, processed by doScores.pl to add a compound score column) this script will produce a .sif network file and two .noa network attribute files, suitable for importing into the Cytoscape (http://www.cytoscape.org/) network visualisation program. The files follow the definition on page http://cytoscape.org/cgi-bin/moin.cgi/Cytoscape_User_Manual/Network_Formats and have been tested on Cytoscape v. 2.6.2 / 2.6.3
 
 REQUIRES: doInterologWalk.pl
 OPTIONAL: doScores.pl

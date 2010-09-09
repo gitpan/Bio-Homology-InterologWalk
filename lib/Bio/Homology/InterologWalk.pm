@@ -19,7 +19,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 
 
@@ -31,7 +31,7 @@ Bio::Homology::InterologWalk - Retrieve, score and visualize putative Protein-Pr
 
 =head1 VERSION
 
-This document describes version 0.04 of Bio::Homology::InterologWalk released September 3rd, 2010
+This document describes version 0.05 of Bio::Homology::InterologWalk released September 9th, 2010
 
 =head1 SYNOPSIS
 
@@ -117,20 +117,21 @@ for the putative interactions obtained:
 
 get some networks and network attributes which you can then visualise with cytoscape
 
+                                    
    $RC = Bio::Homology::InterologWalk::Networks::do_network(
-                                            registry        => $registry,
-                                            input_path      => $in_path,
-                                            output_path     => $out_path,
-                                            source_org      => $sourceorg
-                                            );
+                                           registry    => $registry,
+                                           data_file   => $infilename, 
+                                           data_dir    => $work_dir,
+                                           source_org  => $sourceorg,
+                                           );                                        
                                                
    $RC = Bio::Homology::InterologWalk::Networks::do_attributes(
-                                               registry      => $registry,
-                                               input_path    => $in_path,
-                                               output_path   => $out_path,
-                                               source_org    => $sourceorg,
-                                               label_type    => 'external name'
-                                               );
+                                           registry    => $registry,
+                                           data_file   => $infilename,
+                                           start_file  => $startfilename,
+                                           data_dir    => $work_dir,
+                                           source_org  => $sourceorg,
+                                           );
 
 I<The synopsis above only lists the major methods and parameters.>
 
@@ -238,7 +239,8 @@ Compute a global confidence score to obtain a metric for the reliability of the 
 Extract the binary putative PPIs from the dataset and save them in a format compatible with Cytoscape. This helps providing a visual quality to the result as 
 one could then apply network analysis tools to discover motifs, clusters, well-connected subnetworks, look for GO functional enrichment, and more. 
 The format chosen for the network representation of the dataset is currently C<.sif>. (see http://cytoscape.wodaklab.org/wiki/Cytoscape_User_Manual#Supported_Network_File_Formats) 
-The generation of node attributes is also possible, to allow for visualisation of node tags in terms of simpler human readable labels instead of database IDs.
+The generation of node attributes is also possible, to allow for visualisation of node tags in terms of (a) simpler human readable labels instead of database IDs and
+(b) presence/absence of the node in the initial dataset.
 
 =item 3.
 
@@ -277,7 +279,7 @@ Score the dataset obtained in (2.) using the dataset obtained in (1.) to normali
 =item 4. B<Extract network and attributes for the two PPI datasets.>
 
 For each of the two datasets obtained from (1) and (2) (putative PPIs) or from (1) and (3) (scored putative PPIs) extract a text file containing a network representation and 
-a text file of node attributes. 
+two text files of node attributes. 
 
 See example in C<doNets.pl>
 
@@ -402,25 +404,26 @@ I<See the README file for further information.>
 #globals#############################
 my $ENSEMBLIDFAILED;
 
-our $ERREX          = '.04err';
-our $OUTEX1         = '.01out';
-our $OUTEX2         = '.02out';
-our $OUTEX3         = '.03out';
-our $OUTEX4         = '.04out';
-our $OUTEX5         = '.05out';
-our $OUTEX6         = '.06out';
-our $OUTEX7         = '.07out';
-our $OUTEX_NEW      = '.newID';
-our $OUTEX_NEW_DIR  = '.direct.newID';
-our $OUTEX_SIF      = '.sif';
-our $OUTEX_SCORES   = '.scores';
-our $OUTEX_NOA      = '-name.noa';
-our $NETPREF        = 'NET-';
-our $INTACTEX0      = '.direct.00';
-our $INTACTEX1      = '.direct.01';
-our $INTACTEX2      = '.direct.02';
-my $ENSEMBLVERSION  =  Bio::EnsEMBL::Registry->software_version();
-our $VERSIONEX      = "R" . "$ENSEMBLVERSION" . "_";
+our $ERREX            = '.04err';
+our $OUTEX1           = '.01out';
+our $OUTEX2           = '.02out';
+our $OUTEX3           = '.03out';
+our $OUTEX4           = '.04out';
+our $OUTEX5           = '.05out';
+our $OUTEX6           = '.06out';
+our $OUTEX7           = '.07out';
+our $OUTEX_NEW        = '.newID';
+our $OUTEX_NEW_DIR    = '.direct.newID';
+our $OUTEX_SIF        = '.sif';
+our $OUTEX_SCORES     = '.scores';
+our $OUTEX_NAME_NOA   = '-name.noa';
+our $OUTEX_NOVEL_NOA  = '-novel.noa';
+our $NETPREF          = 'NET-';
+our $INTACTEX0        = '.direct.00';
+our $INTACTEX1        = '.direct.01';
+our $INTACTEX2        = '.direct.02';
+my $ENSEMBLVERSION    =  Bio::EnsEMBL::Registry->software_version();
+our $VERSIONEX        = "R" . "$ENSEMBLVERSION" . "_";
 
 #headers#######################################
 my $FN_initid                 =    'INIT_ID';
@@ -3188,15 +3191,15 @@ use Carp qw(croak);
 =head2 do_network
 
  Usage     : $RC = Bio::Homology::InterologWalk::Networks::do_network(
-                                                      registry       => $registry,
-                                                      input_path     => $in_path,
-                                                      output_path    => $out_path,
-                                                      source_org     => $sourceorg,
-                                                      orthology_type => $orthtype,
-                                                      expand_taxa    => 1,
-                                                      ensembl_db     => $ensembl_db,
-                                                      no_output      => 0
-                                                      );
+                                                       registry       => $registry,
+                                                       data_file      => $infilename, 
+                                                       data_dir       => $work_dir,
+                                                       source_org     => $sourceorg,
+                                                       orthology_type => $orthtype,
+                                                       expand_taxa    => 1,
+                                                       ensembl_db     => $ensembl_db,
+                                                       no_output      => 0
+                                                       );
  Purpose   : This function  writes a .SIF file according to this cytoscape specification in:
              http://cytoscape.org/cgi-bin/moin.cgi/Cytoscape_User_Manual/Network_Formats.
              For each input data row, the subroutine will extract the initial id, the 
@@ -3213,15 +3216,14 @@ use Carp qw(croak);
  Returns   : success/ failure
  Argument  : -registry: ensembl registry object to connect to. Needed to retrieve up-to-date
               human readable gene names from Ensembl for the IDs in the input data file
-             -input_path : path to input file. Input file for this subroutine is a tsv file 
+             -data_file : input file name. Input file for this subroutine is a tsv file 
               containing at least the fields INIT_ID and INTERACTOR.
               (output of get_backward_orthologies() or get_direct_interactions will work, 
               although output of remove_duplicate_rows() is recommended). 
-              Optionally, if interaction scores are desired, input fill will have to be the 
+              Optionally, if interaction scores are desired, input file will have to be the 
               output of the scoring pipeline (see example file doScores.pl)
-             -output_path : where you want the routine to write the data. Data is a TSV .sif 
-              cytoscape file.
-             -source organism name (eg: "Mus musculus")
+             -data_dir: where the routine should look for input data and place output data
+             -source_org: source organism name (eg: "Mus musculus")
              -(OPTIONAL) orthology_type: can be set to 'onetoone': if so, only entries 
               obtained through "one to one" orthology projections will be retained in the output. 
               Default: all orthologies retained.
@@ -3245,18 +3247,35 @@ See Also   : L</remove_duplicate_rows>, L</compute_scores>, L</get_forward_ortho
 
 sub do_network{
      my %args = @_;
+     
      my $registry           = $args{registry};
-     my $in_path            = $args{input_path};
-     my $out_path           = $args{output_path};
+     my $in_file            = $args{data_file};
+     my $data_dir           = $args{data_dir};
      my $sourceorg          = $args{source_org}; 
      my $ortology_class     = $args{orthology_type};
      my $expand_taxa        = $args{expand_taxa}; #default no     
      my $ensembl_db         = $args{ensembl_db};
      my $no_output          = $args{no_output};
      
+     my $query;
+     my $scored;
+     my $it = "pp"; #following cytoscape standard
+     my $dbh; 
+     my $sth;
+     my $out_file;
+     my $in_path; my $out_path;
+     
      #checks
      if(!$registry){
           print("do_network(): no registry defined. Aborting..\n");
+          return;
+     }
+     if(!$in_file){
+          print("do_network(): no input filename specified. Aborting..\n");
+          return;
+     }
+     if(!$data_dir){
+          print("do_network(): no data directory specified. Aborting..\n");
           return;
      }
      if(!$sourceorg){
@@ -3269,12 +3288,25 @@ sub do_network{
                return;
           }
      }
-     $ortology_class = 'allortho' if(!$ortology_class);
      
-     my $query;
-     my $scored;
-     my $it = "pp"; #following cytoscape standard
-     my $dbh; my $sth;
+     $in_path = $data_dir . $in_file;
+     #What input datafile are we dealing with? If it's direct interactions, we won't need to deal with orthologs, etc.
+     if ( $in_file =~ /direct/i ) {
+         print "\ndo_network(): input file appears to be a direct-interactions data file..\n";
+         $ortology_class = "direct";
+     }else {
+         print "do_network(): input file seems to be a putative-interactions data file..\n";
+         if ( !$ortology_class ) {
+             $ortology_class = "allortho";
+             print "do_network(): no orthology class specified..Using default: $ortology_class..\n";
+         }
+         else {
+             print "do_network(): Querying orthology class: $ortology_class.\n";
+         }
+     }
+     $in_file =~ s/(.*)\.(.*)/$1\_$2/;
+     $out_file = $Bio::Homology::InterologWalk::NETPREF . $in_file . $Bio::Homology::InterologWalk::OUTEX_SIF;
+     $out_path = $data_dir . $out_file;
      
      #MANAGE FILES
      open (my $in_data,   q{<}, $in_path) or croak("Unable to open $in_path : $!");
@@ -3284,7 +3316,7 @@ sub do_network{
      
      #read the header, check whether the compound score is present, and create the following query accordingly
      #I'll read the header and see if there's a field containing SCORE. To be improved upon
-     print("Checking for the presence of a compound score field in the input TSV data..\n") unless($no_output);
+     print("\nChecking for the presence of a compound score field in the input TSV data..\n") unless($no_output);
      my $old_header = <$in_data>;
      close $in_data;
      if($old_header =~ /$FN_compound_score/){ #need to check if the score had been computed
@@ -3324,7 +3356,7 @@ sub do_network{
               }
           }
      }else{ 
-          print("Compound score not found, proceeding without..\n\n") unless($no_output);
+          print("Compound score not found..\n\n") unless($no_output);
           print $out_data $HEADER_SIF, "\n";
           
           if($expand_taxa){ #no composite score, taxon info
@@ -3457,29 +3489,36 @@ sub do_network{
 
 =head2 do_attributes
 
- Usage     : $RC = Bio::Homology::InterologWalk::Networks::do_attributes(
-                                                         registry      => $registry,
-                                                         input_path    => $in_path,
-                                                         output_path   => $out_path,
-                                                         source_org    => $sourceorg,
-                                                         label_type    => 'extname',
-                                                         no_output      => 0
-                                                         );
- Purpose   : This is needed to create a node attribute file to go with the .sif 
-             network created by do_networks(). 
+ Usage     : $RC  = Bio::Homology::InterologWalk::Networks::do_attributes(
+                                                     registry    => $registry,
+                                                     data_file   => $infilename,
+                                                     start_file  => $startfilename,
+                                                     data_dir    => $work_dir,
+                                                     source_org  => $sourceorg,
+                                                     label_type  => 'extname'
+                                                     no_output   => 0
+                                                     );
+ Purpose   : This is needed to create two node attribute files to 
+             go with the .sif network created by do_networks(). 
              For a definition of node attribute file, see
              http://cytoscape.wodaklab.org/wiki/Cytoscape_User_Manual#Node_and_Edge_Attributes 
-             The routine associates, for each stable id in the sif file, a human-readable 
-             gene name/description obtained from Ensembl
+             1st node attribute file: The routine associates, for each stable id in the sif file, 
+                                      a human-readable gene name/description obtained from Ensembl.
+             2nd node attribute file: The routine associates, for each stable id in the
+                                      .sif file, a label indicating whether that id was present in
+                                      in the initial dataset or whether it is a novel discovery. 
  Returns   : a boolean value for success/failure
  Argument  : -registry: ensembl registry object to connect to. Needed to retrieve up-to-date
               human readable gene names from Ensembl for the IDs in the input data file
-             -input_path : path to input file. Input file for this subroutine is a tsv file 
-              containing at least the fields INIT_ID and INTERACTOR.
+             -data_file : name of input file, containing PPI data. Input file for this subroutine 
+              is a tsv file containing at least the fields INIT_ID and INTERACTOR.
               (output of get_backward_orthologies() or get_direct_interactions will work, 
               although output of remove_duplicate_rows() is recommended). 
-             -output_path : where you want the routine to write the data. Data is a .noa 
-              cytoscape file.
+             -start_file : this is the name of the original file containing the dataset 
+               of genes used as the input for get_forward_interactions(). Eg a list of one id 
+               per row in ensembl format.
+             -data_dir: where the routine should look for the input data and place the output
+              data
              -source_org : source organism name (eg: "Mus musculus")
              -(OPTIONAL) label_type: what kind of human readable string to employ. Options 
               are 'extname' (external name) and 'description'. Default is 'extname'
@@ -3495,14 +3534,38 @@ See Also   : L</do_network>
 sub do_attributes{
      my %args = @_;
      my $registry         = $args{registry};
-     my $in_path          = $args{input_path};
-     my $out_path         = $args{output_path};
+     my $in_file          = $args{data_file};
+     my $start_data_file  = $args{start_file};#OPTIONAL
+     my $data_dir         = $args{data_dir};
      my $sourceorg        = $args{source_org}; 
      my $label_type       = $args{label_type};
      my $no_output        = $args{no_output};
      
+     my %seen = ();
+     
+     my $SEEN = 'SEEN_IN_START_SET';
+     my $NOVEL = 'NOVEL_PREDICTION';
+     
+     my %start_data_set = ();
+     my $number_of_elements_start_ds;
+     my $out_file_name; my $out_file_novel;
+     my $in_path; my $start_data_path; my $out_path_name; my $out_path_novel;
+     my $start_data; my $out_data_name; my $out_data_novel;
+     
      if(!$registry){
           print("do_attributes(): no registry defined. Aborting..\n");
+          return;
+     }
+     if(!$in_file){
+          print("do_attributes(): no input filename specified. Aborting..\n");
+          return;
+     }
+     if(!$start_data_file){
+          print("do_attributes(): no original data-file name specified. Aborting..\n");
+          return;
+     }
+     if(!$data_dir){
+          print("do_attributes(): no data directory specified. Aborting..\n");
           return;
      }
      if(!$sourceorg){
@@ -3511,14 +3574,36 @@ sub do_attributes{
      }
      $label_type = 'ext' if(!$label_type);
      
-     my %seen = ();
-     #MANAGE FILES
+     #MANAGE FILES=========
+     $in_path = $data_dir . $in_file;
+     $start_data_path = $data_dir . $start_data_file;
      my $dbh = Bio::Homology::InterologWalk::_setup_dbi_connection($in_path);
-     open (my $out_data,  q{>}, $out_path) or croak("Unable to open $out_path : $!");
+     open ($start_data, q{<}, $start_data_path) or croak("Unable to open $start_data_path : $!");
+     
+     $in_file =~ s/(.*)\.(.*)/$1\_$2/;
+     
+     $out_file_name  = $Bio::Homology::InterologWalk::NETPREF . $in_file . $Bio::Homology::InterologWalk::OUTEX_NAME_NOA;
+     $out_file_novel = $Bio::Homology::InterologWalk::NETPREF . $in_file . $Bio::Homology::InterologWalk::OUTEX_NOVEL_NOA;
+     $out_path_name  = $data_dir . $out_file_name;
+     $out_path_novel = $data_dir . $out_file_novel;
+     
+     open ($out_data_name,  q{>}, $out_path_name) or croak("Unable to open $out_path_name : $!");
+     open ($out_data_novel,  q{>}, $out_path_novel) or croak("Unable to open $out_path_novel : $!");
      #============
+     #we slurp all the ids from the initial file into a hash========
+     while(<$start_data>) {
+          my ($ID) = $_;
+          chomp $ID;
+          next if ($ID eq '');
+          $start_data_set{$ID} = 1;
+     }
+     close($start_data);
+     $number_of_elements_start_ds = keys %start_data_set;
+     print "Number of unique ids in start dataset: $number_of_elements_start_ds\n" ;
      
      my $gene_adaptor = $registry->get_adaptor($sourceorg, 'core', 'Gene');
-     print $out_data "Ensembl_Name\n"; #attribute name
+     print $out_data_name  "Ensembl_Name\n"; #node attribute: Ensembl name
+     print $out_data_novel "Novel_id\n"; #node attribute: present in the original dataset or not?
      
      my $query = "SELECT $FN_initid, $FN_interactor_id FROM int";
      my $sth = $dbh->prepare($query);
@@ -3534,7 +3619,16 @@ sub do_attributes{
 
      foreach my $stableid (sort keys %seen){
           my $label;
+          my $novelty;
           my $genesArray = ();
+          
+          if($start_data_set{$stableid}){
+		        $novelty = $SEEN;
+	      }else{
+		        $novelty = $NOVEL;
+	      }
+	      print $out_data_novel $stableid, "\t", "=", "\t", $novelty, "\n";
+          
           my $gene = $gene_adaptor->fetch_by_stable_id($stableid);
           
           if(!$gene){
@@ -3549,8 +3643,8 @@ sub do_attributes{
                     }else{ #no gene object, leaving ID
                          print("do_attributes(): no gene object found for id: $stableid. Leaving as is.\n") unless($no_output);
                          $label = $stableid;
-                         print "$stableid\t=\t$label\n" unless($no_output);
-                         print $out_data $stableid, "\t", "=", "\t", $label, "\n";
+                         print "$stableid\t=\t$label   ($novelty)\n" unless($no_output);
+                         print $out_data_name $stableid, "\t", "=", "\t", $label, "\n";
                          next;
                     }
                }
@@ -3565,10 +3659,11 @@ sub do_attributes{
                return;
           }
           $label = $stableid if(!$label);
-          print "$stableid\t=\t$label\n" unless($no_output);
-          print $out_data $stableid, "\t", "=", "\t", $label, "\n";
+          print "$stableid\t=\t$label   ($novelty)\n" unless($no_output);
+          print $out_data_name $stableid, "\t", "=", "\t", $label, "\n";
      }
-     close $out_data;
+     close $out_data_name;
+     close $out_data_novel;
      $dbh->disconnect();
      return 1;
 }

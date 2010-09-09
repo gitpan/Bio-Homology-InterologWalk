@@ -8,7 +8,7 @@
 # package. This file uses Getopt::Long for simple management of command line arguments,
 # and Term::AnsiColor for clearer console output.
 
-#USAGE perl doInterologWalk.pl -filename='mmus_test.txt' -sourceorg='Mus musculus' -destorg='all'
+#USAGE perl doInterologWalk.pl -filename="mmus_test.txt" -sourceorg="Mus musculus" -destorg="all"
 
 use strict;
 use warnings;

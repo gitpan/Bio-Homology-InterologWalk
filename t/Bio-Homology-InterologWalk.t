@@ -9,8 +9,8 @@ my $url = "http://www.ebi.ac.uk/Tools/webservices/psicquic/intact/webservices/cu
 my $test_data_dir = 't/testdata/';
 my $ont_path   = 'scripts/Data/psi-mi.obo';
 
-BEGIN { use_ok('Bio::Perl') };
-BEGIN { use_ok('Bio::EnsEMBL::Registry') };
+require_ok('Bio::Perl');
+require_ok('Bio::EnsEMBL::Registry');
 BEGIN { use_ok('Bio::Homology::InterologWalk') };
 
 diag("\n");
@@ -145,26 +145,24 @@ my $rc_6 = Bio::Homology::InterologWalk::Scores::compute_scores(
 
 ok( defined $rc_6,            "compute_scores() return value appears to be correct" );
 
-$in_path = $out_path;
-$out_path = $test_data_dir . "mmus.test7";
 my $rc_7 = Bio::Homology::InterologWalk::Networks::do_network(
-                                              registry        => $registry,
-                                              input_path      => $in_path,
-                                              output_path     => $out_path,
-                                              source_org      => $sourceorg,
-                                              no_output       => 1
-                                              );
+                                             registry    => $registry,
+                                             data_file   => "mmus.test6", 
+                                             data_dir    => $test_data_dir,
+                                             source_org  => $sourceorg,
+                                             no_output   => 1
+                                             );
                                               
 ok( defined $rc_7,            "do_network() return value appears to be correct" );
 
-$out_path = $test_data_dir . "mmus.test8";
 my $rc_8 = Bio::Homology::InterologWalk::Networks::do_attributes(
-                                                 registry      => $registry,
-                                                 input_path    => $in_path,
-                                                 output_path   => $out_path,
-                                                 source_org    => $sourceorg,
-                                                 no_output     => 1
-                                                 );
+                                                registry    => $registry,
+                                                data_file   => "mmus.test6",
+                                                start_file  => "mmus.txt",
+                                                data_dir    => $test_data_dir,
+                                                source_org  => $sourceorg,
+                                                no_output   => 1
+                                                );
                                                  
 ok( defined $rc_8,            "do_attributes()  return value appears to be correct" );
 

@@ -1,5 +1,13 @@
 Revision history for Perl extension Bio::Homology::InterologWalk.
 
+0.05  Thu Sep 09 18:50:26 2010
+        - do_attributes() now writes two attribute files: name attribute
+          and novel id attribute.
+        - Interface redesigned for do_networks() and do_attributes()
+          to simplify introduction of new node attribute file
+        - sample usage file doNets.pl rewritten to show usage of new interface
+          for the two methods
+
 0.04  Fri Sep 03 01:09:26 2010
         - removed version bug
         - removed local library requirement in test script
