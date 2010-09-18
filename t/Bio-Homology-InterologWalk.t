@@ -9,8 +9,11 @@ my $url = "http://www.ebi.ac.uk/Tools/webservices/psicquic/intact/webservices/cu
 my $test_data_dir = 't/testdata/';
 my $ont_path   = 'scripts/Data/psi-mi.obo';
 
+
 require_ok('Bio::Perl');
-require_ok('Bio::EnsEMBL::Registry');
+require_ok('Bio::EnsEMBL::Registry') or diag(
+     "The Ensembl Perl API was not found.\n"
+);
 BEGIN { use_ok('Bio::Homology::InterologWalk') };
 
 diag("\n");
@@ -130,7 +133,7 @@ ok( $onto_graph->isa('GO::Model::Graph'), "parse_ontology() returns correct obje
 
 $in_path = $out_path;
 $out_path = $test_data_dir . "mmus.test6";
-my $rc_6 = Bio::Homology::InterologWalk::Scores::compute_scores(
+my $rc_6 = Bio::Homology::InterologWalk::Scores::compute_confidence_score(
                                         input_path        => $in_path,
                                         output_path       => $out_path,
                                         term_graph        => $onto_graph,
@@ -143,7 +146,7 @@ my $rc_6 = Bio::Homology::InterologWalk::Scores::compute_scores(
                                         no_output         => 1
 );
 
-ok( defined $rc_6,            "compute_scores() return value appears to be correct" );
+ok( defined $rc_6,            "compute_confidence_score() return value appears to be correct" );
 
 my $rc_7 = Bio::Homology::InterologWalk::Networks::do_network(
                                              registry    => $registry,

@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Bio-Homology-InterologWalk
-version:            0.05
+version:            0.06
 abstract:           Retrieve, score and visualize putative Protein-Protein Interactions through the orthology-walk method
 author:
     - Giuseppe Gallone <ggallone@cpan.org>
@@ -11,15 +11,10 @@ configure_requires:
 build_requires:
     ExtUtils::MakeMaker:  0
 requires:
-    Bio::EnsEMBL::Registry:  0
-    Bio::Perl:            0
-    Carp:                 0
-    DBD::CSV:             0
-    File::Glob:           0
-    GO::Parser:           0
-    List::Util:           0
-    REST::Client:         0
-    String::Approx:       0
+    Carp:          0
+    File::Glob:    0
+    Getopt::Long:  0
+    List::Util:    0
 no_index:
     directory:
         - t

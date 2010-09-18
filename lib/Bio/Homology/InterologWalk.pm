@@ -19,8 +19,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
-our $VERSION = '0.05';
-
+our $VERSION = '0.06';
 
 
 #################### main pod documentation begins ###################
@@ -31,7 +30,7 @@ Bio::Homology::InterologWalk - Retrieve, score and visualize putative Protein-Pr
 
 =head1 VERSION
 
-This document describes version 0.05 of Bio::Homology::InterologWalk released September 9th, 2010
+This document describes version 0.06 of Bio::Homology::InterologWalk released September 18th, 2010
 
 =head1 SYNOPSIS
 
@@ -103,7 +102,7 @@ do some postprocessing (see L</remove_duplicate_rows>, L</do_counts>, L</extract
 and then optionally compute a composite score
 for the putative interactions obtained:
 
-  $RC = Bio::Homology::InterologWalk::Scores::compute_scores(
+  $RC = Bio::Homology::InterologWalk::Scores::compute_confidence_score(
                                              input_path        => $in_path,
                                              score_path        => $score_path,
                                              output_path       => $out_path,
@@ -412,6 +411,7 @@ our $OUTEX4           = '.04out';
 our $OUTEX5           = '.05out';
 our $OUTEX6           = '.06out';
 our $OUTEX7           = '.07out';
+our $OUTEX8           = '.08out';
 our $OUTEX_NEW        = '.newID';
 our $OUTEX_NEW_DIR    = '.direct.newID';
 our $OUTEX_SIF        = '.sif';
@@ -475,6 +475,7 @@ my $HEADER_BWD_ORTH = join("\t", $FN_interactor_id, $FN_oname_2,
                                  $FN_nndist_2, $FN_fsa_orig_species_2, $FN_fsa_dest_species_2);
 
 my $FN_compound_score         =    'COMPOUND_SCORE';
+my $FN_conservation_score     =    'CONSERVATION_SCORE';
 
 my $HEADER_SCORE              =    $FN_compound_score; 
 
@@ -1098,7 +1099,11 @@ sub get_interactions{
      
      #Header
      print $out_data $HEADER_FWD_ORTH, "\t", $HEADER_INT, "\n";
-     my $options = _build_query_options($no_spokes, $exp_only, $physical_only);
+     my $options = _build_query_options(
+                            no_spoke   => $no_spokes, 
+                            exp_only   => $exp_only,
+                            phys_only  => $physical_only
+                            );
      
      while (my $rowHash = $sthHash->fetchrow_hashref){
           my @oldDataVec = $sthVec->fetchrow_array(); 
@@ -1894,7 +1899,12 @@ sub _compare_uniprotkbids{
 #
 #See Also   : 
 sub _build_query_options{
-     my ($no_spoke, $exponly, $physonly) = @_;
+     my %args = @_;
+     
+     my $no_spoke    = $args{no_spoke};
+     my $exponly     = $args{exp_only};
+     my $physonly    = $args{phys_only};
+     
      my $outputstring;
      
      #eg " AND type:\"physical*\" AND detmethod:\"experimental*\" AND NOT expansion:\"spoke\"";
@@ -1991,6 +2001,7 @@ sub _get_interactor_name{
 sub _get_interactor_uniprot_id{
      my ($id) = @_;
      my $value;
+     
      #ids in order of preference
      #uniprot accession number preferred to intact cause it's recognised by ensembl
      if($id =~ /(ensembl):(\w+)\|(.*)/){ #es ensembl:ENSG00000122592
@@ -2007,6 +2018,11 @@ sub _get_interactor_uniprot_id{
      }
      return $value;
 }
+
+
+
+
+
 
 #
 #_get_interactor_aliases
@@ -2274,6 +2290,7 @@ sub _process_homologies{
           #also contain the original gene I made my query with.
           foreach my $homology_member (@{$genelist}){
                $DF_orthologue_id = $homology_member->stable_id;
+               next if(!$DF_orthologue_id);
                #my $mid = $homology_member->get_longest_peptide_Member->member_id; OBSOLETE
                my $mid = $homology_member->get_canonical_peptide_Member->member_id; #USE WITH V. > 57
                
@@ -2379,6 +2396,11 @@ package Bio::Homology::InterologWalk::Scores;
 #############################################
 use List::Util qw[min max sum];
 use File::Glob;
+use Graph::Undirected;
+#use Math::Combinatorics;
+use Data::PowerSet 'powerset';
+use URI::Escape;
+use Algorithm::Combinatorics qw(combinations);#TODO The other one is better in many respects
 
 #MITAB ontology core nodes
 my $interaction_detection_method_acc = "MI:0001";
@@ -2627,9 +2649,9 @@ sub _get_multiple_taxa_mean_score{
      return $mean_ME_TAXA_score;
 }
 
-=head2 compute_scores
+=head2 compute_confidence_score
 
- Usage     : $RC = Bio::Homology::InterologWalk::Scores::compute_scores(
+ Usage     : $RC = Bio::Homology::InterologWalk::Scores::compute_confidence_score(
                                                         input_path        => $in_path,
                                                         score_path        => $score_path,
                                                         output_path       => $out_path,
@@ -2656,7 +2678,7 @@ sub _get_multiple_taxa_mean_score{
              The score computation will also involve a normalisation stage. The subroutine requires 
              five arguments (meanscore_x) representing mean values to be used for normalisation.
              The actually means are computed in get_mean_scores(), which is pre-requisite to 
-             compute_scores().
+             compute_confidence_score().
  Returns   : success/failure
  Argument  : -input_path : path to the input tsv file. A suitable input for this subroutine is the 
              final output of the orthology walk pipeline (see doInterologWalk.pl for usage guidelines).
@@ -2683,7 +2705,7 @@ See Also   : L<http://search.cpan.org/~cjfields/BioPerl-1.6.1/Bio/SimpleAlign.pm
 =cut
 
 
-sub compute_scores{
+sub compute_confidence_score{
      my %args = @_;
      my $in_path                   = $args{input_path};
      my $out_path                  = $args{output_path};
@@ -2697,7 +2719,7 @@ sub compute_scores{
      my $no_output                 = $args{no_output};
      
      if(!$graph){
-          print("compute_scores(): PSI-MI graph representation not found. Aborting..\n");
+          print("compute_confidence_score(): PSI-MI graph representation not found. Aborting..\n");
           return;
      }
      unless($mean_exp_method_score  && 
@@ -2706,10 +2728,9 @@ sub compute_scores{
             $mean_multiple_dm_score &&
             $mean_multiple_taxa_score){
                  
-                 print("compute_scores(): missing mean scores. Aborting..\n");
+                 print("compute_confidence_score(): missing mean scores. Aborting..\n");
                  return;
      }
-     
      
      my @nodeNodeDist = ();
      my $MAXNNDISTANCE = 0;
@@ -2844,6 +2865,307 @@ sub compute_scores{
      $dbh->disconnect;
      close $out_data;
      close $score_data if($score_data);
+     return 1;
+}
+
+
+=head2 compute_conservation_score
+
+ Usage     : $RC = Bio::Homology::InterologWalk::Scores::compute_conservation_score(
+                                                                  input_path   => $in_path,
+                                                                  output_path  => $out_path,
+                                                                  score_path   => $score_path,
+                                                                  url          => $intact_url
+                                                                  );
+ Purpose   : TODO
+ Returns   : success/failure
+ Argument  : -input_path : path to the input tsv file. A suitable input for this subroutine is the 
+              final output of the orthology walk pipeline (see doInterologWalk.pl for usage guidelines).
+              The output of compute_confidence_score is also ok.
+              input file should have .06out or .07out extension
+             -score_path : path to text file where scores will be saved. File will be a tsv indicating
+              for each row, number of nodes, edges, gamma-density and C-score for the subnetwork 
+              retrieved.
+              (useful for looking at score distributions eg through matlab)
+             -output_path : where you want the routine to write the data. Data is in TSV format. 
+              File extension is .08out
+             -url: url for the REST service to query (currently only EBI Intact PSICQUIC Rest)
+ Throws    : -
+ Comment   : 
+
+See Also   : 
+
+=cut
+
+
+#Edges representing autointeractions are ignored at the moment
+
+sub compute_conservation_score{
+     my %args = @_;
+     my $in_path              = $args{input_path};
+     my $out_path             = $args{output_path};
+     my $hist_path            = $args{score_path};
+     my $url                  = $args{url};
+     my $MAX_NODES            = $args{max_nodes};
+     
+     if(!$url || !$MAX_NODES){
+          print("compute_conservation_score(): argument list incomplete. Aborting..\n");
+          return; 
+     }
+     #PSICQUIC GLOBAL search string
+     my $glob_search_string = "search/query/";
+     $url .= $glob_search_string;
+     
+     my (%count, @newints, $Cscore, $gamma);
+     my ($total_edge_number, $total_node_number); 
+     my $AUTOINT; 
+     my $interactorBUFFER1 = "";
+     my $interactorBUFFER2 = "";
+     my $interactorListBUFFER1 = "";
+     my $interactorListBUFFER2 = "";
+     my ($interactorListA, $interactorListB);
+     
+     my $client = REST::Client->new();
+     
+     #MANAGE FILES==
+     open (my $in_data,   q{<}, $in_path)   or croak("Unable to open $in_path : $!");
+     my $old_header = <$in_data>;
+     close $in_data;
+     open (my $hist_data, q{>}, $hist_path) or croak("Unable to open $hist_path : $!");
+     open (my $out_data,  q{>}, $out_path)  or croak("Unable to open $out_path : $!");
+     my $dbh = Bio::Homology::InterologWalk::_setup_dbi_connection($in_path);
+     #==============
+     
+     #headers----
+     chomp($old_header);
+     print $out_data $old_header."\t".$FN_conservation_score."\n"; 
+     print $hist_data "NODES\tEDGES\tGAMMA\tCSCORE\n";
+     #-----------
+
+     my $options = Bio::Homology::InterologWalk::_build_query_options(
+                       #no_spoke   => 1, 
+                       exp_only   => 1,
+                       phys_only  => 1
+                       );
+     
+     my $query = "SELECT * FROM int";
+     my $sthHash = $dbh->prepare($query);
+     my $sthVec = $dbh->prepare($query);
+     $sthHash->execute() or die "Cannot execute: " . $sthHash->errstr();
+     $sthVec->execute()  or die "Cannot execute: " . $sthVec->errstr();
+     
+     #hash where
+     #key = "interactorA-interactorB" and
+     #value = "nodes\tedges\tgamma\tcscore"
+     my %pairseen = ();
+     #mega hash with all the interactions I find.
+     my %interactorHash = ();
+     
+     while (my $rowHash = $sthHash->fetchrow_hashref){
+          my @rowVec = $sthVec->fetchrow_array();
+          my $interactorA = $rowHash->{$FN_acc_numb_a};
+          my $interactorB = $rowHash->{$FN_acc_numb_b};
+          
+          #initialise---
+          $Cscore = 0;
+          $gamma  = 0;  
+          if($interactorA eq $interactorB){
+               $total_edge_number = 0; #atm I'm neglecting the self-edge of the autointeraction
+               $total_node_number = 1;
+               $AUTOINT = 1;
+          }else{
+               $total_edge_number = 1;#because we have at least one edge, the actual interolog interaction 
+               $total_node_number = 2; #because we have at least two nodes, the actual interolog interactors
+               $AUTOINT = 0;
+          }
+          my $newNodes = 0;
+          %count = ();
+          @newints = ();
+          my %temp = ();
+          my $scoreEntry = "";
+          #-------------
+
+          my $interactorpair = join("-",sort($interactorA,$interactorB));
+          
+          if($pairseen{$interactorpair}){ #I've seen this pair before, I have its quasi clique
+               print "($interactorA,$interactorB): Found in hash..\n";
+		       $scoreEntry = $pairseen{$interactorpair};
+		       print $hist_data $scoreEntry, "\n";
+		       #tmp:
+		       my @elements = split(/\t/, $scoreEntry);
+		       my $newRow = join("\t", @rowVec, $elements[3]);
+               print $out_data $newRow, "\n";  
+		       next;
+          }
+               
+          print "($interactorA,$interactorB): querying Intact for shared interactors..";
+          #check buffers------
+          if($interactorA eq $interactorBUFFER1){
+               $interactorListA = $interactorListBUFFER1;
+          }elsif($interactorA eq $interactorBUFFER2){
+               $interactorListA = $interactorListBUFFER2;
+          }else{
+               $interactorListA = _get_interactor_list(
+                                                          id            => $interactorA,
+                                                          rest_client   => $client,
+                                                          url           => $url,
+                                                          options       => $options
+                                                       );
+          }
+          
+          if($interactorB eq $interactorBUFFER1){
+               $interactorListB = $interactorListBUFFER1;
+          }elsif($interactorB eq $interactorBUFFER2){
+               $interactorListB = $interactorListBUFFER2;
+          }else{
+               $interactorListB = _get_interactor_list(
+                                                          id            => $interactorB,
+                                                          rest_client   => $client,
+                                                          url           => $url,
+                                                          options       => $options
+                                                       );
+          }
+          $interactorBUFFER1 = $interactorA;
+          $interactorBUFFER2 = $interactorB;
+	      $interactorListBUFFER1 = $interactorListA; 
+	      $interactorListBUFFER2 = $interactorListB;
+	      #-------------------  
+	      
+		  if($AUTOINT){
+		       @newints = @$interactorListA if(defined($interactorListA));
+		       $newNodes = scalar(@newints);
+		       $total_edge_number += $newNodes;
+		  }else{
+		       #compute intersection of nodes interacting with both starting ids
+		       map { $temp{$_} = 1 } @$interactorListA;
+		       @newints = grep { $temp{$_} } @$interactorListB;
+		       #the number of elements in newints represents the number of new interactors in the subnet.
+		       $newNodes = scalar(@newints);
+		       $total_edge_number += (2 * $newNodes);
+		  }
+		  $total_node_number += $newNodes;
+		  print "  No new nodes found\n" if($newNodes == 0);
+          print "  1 new node  found\n" if($newNodes == 1);
+		  
+		  ########################
+		  #checking for interactions BETWEEN the newly discovered nodes
+		  ########################
+		  if($newNodes <= 1){
+			   if($AUTOINT and ($total_node_number eq 1)){
+			        $gamma = 0;
+			   }else{
+                    $gamma = (2 * $total_edge_number) / ($total_node_number * ($total_node_number - 1));
+			   }
+   			   $Cscore = $gamma * $total_edge_number;
+   			   $scoreEntry = join("\t", $total_node_number, $total_edge_number, $gamma, $Cscore);
+               $pairseen{$interactorpair} = $scoreEntry;
+               print $hist_data $scoreEntry, "\n";
+		       my $newRow = join("\t", @rowVec, $Cscore);
+               print $out_data $newRow, "\n";  
+               next;
+		  }
+		  #------
+		  #more than one discovered node
+          #------
+          #create graph and add edges between initial interactors and shared ones
+          my $graph = Graph::Undirected->new;
+          if($AUTOINT){
+              foreach my $node (@newints){
+                  $graph->add_edge($node,$interactorA);
+              }
+          }else{
+              $graph->add_edge($interactorA,$interactorB);
+              foreach my $node (@newints){
+                  $graph->add_edge($node,$interactorA);
+                  $graph->add_edge($node,$interactorB);
+              }
+          }
+          
+          #now let's look for interactions between the new nodes
+          print("\n-----Found $newNodes new nodes. Checking for their interactions..");  
+          my $newEdges = 0;
+          my $combinations = combinations(\@newints,2);
+          while (my $comb = $combinations->next) {
+              my $ipair = join("-",sort(@$comb[0],@$comb[1]) );
+              #first I'll check if it's in either of the two hashes
+              if($pairseen{$ipair} or $interactorHash{$ipair}){
+                  $total_edge_number += 1; #remove this, I'll get it from the graph
+                  $newEdges += 1;
+                  $graph->add_edge(@$comb[0], @$comb[1]);
+              }elsif(_interaction_exists(
+                                          int_a        => @$comb[0], 
+                                          int_b        => @$comb[1],
+                                          rest_client  => $client,
+                                          url          => $url,
+                                          options      => $options
+                                         ) ){
+                  #as a last attempt I'll look into intact. If I find it, I'll store it in the hash
+                  $total_edge_number += 1;
+                  $newEdges += 1;
+                  $graph->add_edge(@$comb[0], @$comb[1]);
+                  $interactorHash{$ipair} = 1;
+              }
+          }
+          print("\n----------Done. Found $newEdges new edges.\n");#TODO
+		  
+		  if( ($newEdges == 0) || ($newNodes >= $MAX_NODES)){
+               $Cscore = _c_score($total_edge_number,$total_node_number);
+               print $Cscore if($Cscore == 0); #TODO DIAGNOSTICS remove
+               $gamma = $Cscore / $total_edge_number;
+               $scoreEntry = join("\t", $total_node_number, $total_edge_number, $gamma, $Cscore);
+               $pairseen{$interactorpair} = $scoreEntry;
+               print $hist_data $scoreEntry, "\n";
+               my $newRow = join("\t", @rowVec, $Cscore);
+               print $out_data $newRow, "\n"; 
+               next;
+          }
+          
+          print "\n---------------Trying to improve C-Score by removing low-degree nodes..";
+          my $partitions = Data::PowerSet->new({min => 1, max => ($newNodes - 1)}, \@newints);
+
+          my $tmpEdgeNumber;
+          my $candidateEN = $total_edge_number;
+          my $tmpNodeNumber;
+          my $candidateNN = $total_node_number;
+          my $candidateCScore = 0;
+               
+          #initial "full" Cscore
+          $candidateCScore = _c_score($total_edge_number,$total_node_number);
+          my $initCScore = $candidateCScore;	
+          while (my $partition = $partitions->next){
+               #reinitialise graph
+               my $graphTemp = $graph->copy();
+               #remove all nodes and edges in the partition set
+               foreach my $p (@{$partition}){
+                    $graphTemp->delete_vertex($p);
+               }
+               $tmpNodeNumber = $graphTemp->vertices();
+               $tmpEdgeNumber = $graphTemp->edges();
+               #compute new Cscore
+               my $tempCScore = _c_score($tmpEdgeNumber,$tmpNodeNumber);
+               #is it higher? then replace
+               if($tempCScore > $candidateCScore){
+                    $candidateCScore = $tempCScore;
+                    $candidateEN = $tmpEdgeNumber;
+                    $candidateNN = $tmpNodeNumber;
+               }
+          }
+          print("\n---------------$candidateCScore ($candidateNN, $candidateEN)\t-\t$initCScore ($total_node_number, $total_edge_number)\n\n");
+          $Cscore = $candidateCScore; 
+          $total_node_number = $candidateNN;
+          $total_edge_number = $candidateEN;
+          $gamma = $Cscore / $total_edge_number;
+          $scoreEntry = join("\t", $total_node_number, $total_edge_number, $gamma, $Cscore);
+          $pairseen{$interactorpair} = $scoreEntry;
+          print $hist_data $scoreEntry, "\n";
+          my $newRow = join("\t", @rowVec, $Cscore);
+          print $out_data $newRow, "\n";   
+     }#while loop
+     $sthHash->finish;
+     $sthVec->finish;
+     $dbh->disconnect;
+     close $out_data;
+     close $hist_data;
      return 1;
 }
 
@@ -3179,6 +3501,120 @@ sub _score_interaction{
      return $globalScore;
 }
 
+sub _get_uniprot_id{
+	my ($id) = @_;
+	my $value;
+
+	if($id =~ /(uniprotkb):(\w+)\|(.*)/){ #es uniprotkb:Q9BXW9
+		$value = $2;
+	}elsif($id =~ /(uniprotkb):(\w+-\d+)\|(.*)/){#es uniprotkb:Q9BXW9-2|intact:EBI-596878
+		$value = $2;
+	}elsif($id =~ /(ensembl):(\w+)\|(.*)/){
+		$value = $2;
+	}elsif($id =~ /(intact):(EBI-\d+)/){
+		$value = $2;
+	}elsif($id =~ /(uniparc):(\w+)\|(.*)/){
+		$value = $2;
+	}elsif($id =~ /(genbank_protein_gi):(\w+)\|(.*)/){
+		$value = $2;
+	}else{
+		print "extractUniprotID(): unrecognised entry format: $id. Skipping..\n";
+		return undef;
+	}
+	return $value;
+}
+
+
+sub _c_score{
+	my ($E, $N) = @_;
+	
+	return ( (2 * $E * $E) / ($N * ($N - 1)) );
+}
+
+
+sub _get_cscore_from_entry{
+     my ($entry_string) = @_;
+     
+     my @elements = split(/\t/, $entry_string);
+     return $elements[3];
+}
+
+sub _get_interactor_list{
+     my %args = @_;
+     my $interactor   = $args{id};
+     my $client       = $args{rest_client};
+     my $url          = $args{url};
+     my $options      = $args{options};
+     
+	my %results = ();
+	
+	my $queryterm = "id:" . $interactor;
+	$queryterm .= $options;
+	my $encodedquery = uri_escape($queryterm);
+	
+	#building REST request
+	my $request = $url . $encodedquery;
+	$client->GET($request);
+	
+	my $code = $client->responseCode();
+	if($code ne "200"){
+		print("_get_interactor_list(): client returned bad ($code) response code. Skipping..\n");
+		return undef;
+	}
+
+	my $responseContent = $client->responseContent();
+	return undef if(!$responseContent);
+	
+	my @responsetoparse = split(/\n/,$responseContent);
+	#my $interactionsRetrieved = scalar @responsetoparse;
+	#print "..Interactions found: ", $interactionsRetrieved, "\n";
+	
+	foreach my $intactInteraction (@responsetoparse){
+		my @MITABDataRow = split("\t",$intactInteraction);
+		
+		my $acc_numb_A = _get_uniprot_id($MITABDataRow[0]);
+		next unless(defined($acc_numb_A));
+		my $acc_numb_B = _get_uniprot_id($MITABDataRow[1]);
+		next unless(defined($acc_numb_B));
+		
+		if($interactor eq $acc_numb_A){
+			$results{$acc_numb_B} = 1 unless($interactor eq $acc_numb_B);
+		}elsif($interactor eq $acc_numb_B){
+			$results{$acc_numb_A} = 1 unless($interactor eq $acc_numb_A);
+		}else{
+			print("getInteractors(): mismatch between $interactor, $acc_numb_A, $acc_numb_B. Skipping..\n");
+			next;
+		}
+	}
+	my @resultList = keys(%results);
+	return \@resultList;
+}
+
+#this returns defined if the interaction between the two desired ids is reported in intact
+sub _interaction_exists{
+     my %args = @_;
+     my $intA         = $args{int_a};
+     my $intB         = $args{int_b};
+     my $client       = $args{rest_client};
+     my $url          = $args{url};
+     my $options      = $args{options};
+	
+	my $queryids = "id:(" . $intA . " AND " . $intB . ")"; 
+	my $queryterm = $queryids . $options;
+	
+	#use function to convert all the unsafe symbols of string to its URL encode representation
+	my $encodedquery = uri_escape($queryterm);
+	my $request = $url . $encodedquery;
+	
+	$client->GET($request);
+	
+	if($client->responseContent()){
+		return 1;
+	}else{
+		return undef;
+	}
+}
+
 
 
 ###############################################
@@ -3241,7 +3677,7 @@ use Carp qw(croak);
              2) do a lexicographic sorting before caching and before looking-up the cache
              I use the second option at the moment.
 
-See Also   : L</remove_duplicate_rows>, L</compute_scores>, L</get_forward_orthologies>
+See Also   : L</remove_duplicate_rows>, L</compute_confidence_score>, L</get_forward_orthologies>
 
 =cut
 
@@ -4039,8 +4475,11 @@ sub get_direct_interactions{
      #Header
      print $out_data $HEADER_DIRECT, "\n";
      
-     my $options = Bio::Homology::InterologWalk::_build_query_options($no_spokes, $exp_only, $physical_only);
-     #eg " AND type:\"physical*\" AND detmethod:\"experimental*\" AND NOT expansion:\"spoke\"";
+     my $options = Bio::Homology::InterologWalk::_build_query_options(
+                       no_spoke   => $no_spokes, 
+                       exp_only   => $exp_only,
+                       phys_only  => $physical_only
+                       );
 
      my $missed = 0;
      while (<$in_data>){

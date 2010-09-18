@@ -1,17 +1,17 @@
-Bio-Homology-InterologWalk version 0.05
+Bio-Homology-InterologWalk version 0.06
 =======================================
 
-This document refers to version 0.05 of Bio::Homology::InterologWalk.
-This version was released September 9th, 2010.
+This document refers to version 0.06 of Bio::Homology::InterologWalk.
+This version was released September 18th, 2010.
 
 INSTALLATION-------------------------------------------------------------------------
 
 To install this module on your system, place the tarball archive file in a 
 temporary directory and call the following:
 
-% gunzip Bio-Homology-InterologWalk-0.05.tar.gz
-% tar xf Bio-Homology-InterologWalk-0.05.tar
-% cd Bio-Homology-InterologWalk-0.05
+% gunzip Bio-Homology-InterologWalk-0.06.tar.gz
+% tar xf Bio-Homology-InterologWalk-0.06.tar
+% cd Bio-Homology-InterologWalk-0.06
 % perl Makefile.PL
 % make
 % make test
@@ -136,6 +136,13 @@ You will also need to install the following modules (including all dependencies)
 4. String::Approx
 5. List::Util
 6. File::Glob
+
+The following modules are only required if you intend to compute conservation scores for the 
+putative PPIs retrieved:
+7.  Graph
+8.  Data::PowerSet
+9.  URI::Escape
+10. Algorithm::Combinatorics
 
 =====================
 4. NOTE FOR MAC USERS
