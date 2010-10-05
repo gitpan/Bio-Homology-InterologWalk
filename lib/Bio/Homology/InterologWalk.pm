@@ -19,7 +19,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 
 #################### main pod documentation begins ###################
@@ -30,7 +30,7 @@ Bio::Homology::InterologWalk - Retrieve, score and visualize putative Protein-Pr
 
 =head1 VERSION
 
-This document describes version 0.06 of Bio::Homology::InterologWalk released September 18th, 2010
+This document describes version 0.07 of Bio::Homology::InterologWalk released October 5th, 2010
 
 =head1 SYNOPSIS
 
@@ -2276,7 +2276,9 @@ sub _process_homologies{
           #the following filters the orthologies on the basis of their description             
           $DF_odesc = $homology->description;
           next if ($DF_odesc =~ /paralog/); #if you want paralogues instead work here
-          next if (($oo_only) && (!($DF_odesc =~ /one2one/)));
+          #possible_ortholog: dubious duplication/speciation node labelling.
+          next if ($DF_odesc =~ /possible_ortholog/);
+          next if (($oo_only) && (!($DF_odesc =~ /^ortholog_one2one$/)));
           
           $counter += 1;
           #$osubtype = $homology->subtype; #not sure i need it for now

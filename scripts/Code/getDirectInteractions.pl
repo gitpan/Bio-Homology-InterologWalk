@@ -28,7 +28,7 @@ GetOptions('filename=s'=>\$infilename,
            'sourceorg=s'=>\$sourceorg);
 #filenames and files===============================================
 if(!$infilename){
-     $infilename = 'schizophreniamouselist.txt';
+     $infilename = 'mmus_test.txt';
      print "getDirectInteractions.pl: No filename specified..Trying default..$infilename\n";
 }else{
      print "getDirectInteractions.pl: using input file: $infilename\n";
@@ -123,7 +123,7 @@ if(!$RC3){
 
 
 $in_path = $out_path;
-$out_filename = $Bio::Homology::InterologWalk::VERSIONEX . $infilename. $Bio::Homology::InterologWalk::OUTEX_NEW;
+$out_filename = $Bio::Homology::InterologWalk::VERSIONEX . $infilename. $Bio::Homology::InterologWalk::OUTEX_NEW_DIR;
 $out_path = $work_dir . $out_filename;
 
 #let's create a file containing all the new ids discovered (ids not present in the starting set)
