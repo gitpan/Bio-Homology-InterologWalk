@@ -19,7 +19,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 
 #################### main pod documentation begins ###################
@@ -30,7 +30,7 @@ Bio::Homology::InterologWalk - Retrieve, score and visualize putative Protein-Pr
 
 =head1 VERSION
 
-This document describes version 0.07 of Bio::Homology::InterologWalk released October 5th, 2010
+This document describes version 0.08 of Bio::Homology::InterologWalk released October 7th, 2010
 
 =head1 SYNOPSIS
 
@@ -1489,7 +1489,7 @@ sub get_backward_orthologies{
                     }
                     
                     if(!$member){
-                         print "$DF_interaction_id-($candidate): member_adaptor->fetch_by_source_stable_id returns no member object.\n" unless($no_output);
+                         print "$DF_interaction_id-($DF_acc_numb_a, $DF_acc_numb_b): fetch_by_source_stable_id returns no member object.\n" unless($no_output);
                          if($err_path){
                             print $err_data $entry, "\n";
                             $entries_err_found = 1;

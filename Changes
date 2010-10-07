@@ -1,9 +1,13 @@
 Revision history for Perl extension Bio::Homology::InterologWalk.
 
+0.08  Thu Oct 07 12:12:26 2010
+        - removed commented lines in doScores.pl
+        - fixed empty candidate bug in get_backward_orthologies()
+
 0.07  Tue Oct 05 14:50:26 2010
         - rewrote _process_homologies() to get rid of "possible_ortholog"
           paralogy class
-        - corrected extension bug in getDirectInteractions.pl
+        - fixed extension bug in getDirectInteractions.pl
 
 0.06  Sat Sep 18 19:50:26 2010
         - introduced new method for computing conservation score for the

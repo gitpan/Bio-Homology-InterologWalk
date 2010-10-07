@@ -69,14 +69,13 @@ $score_path = $work_dir . $score_filename;
 #Computing Mean Multiple taxa score
 #==================================================================
 #WARNING: this might take a long time
-#$m_mtaxa = Bio::Homology::InterologWalk::Scores::compute_multiple_taxa_mean(
-#                                                            ds_size   => 15,          
-#                                                            #size: ideally it should be comparable to the dataset size
-#                                                            ds_number => 2,           
-#                                                            #max is currently 7, equal to the number of taxa with significant amount of data
-#                                                            datadir   => $work_dir
-#                                                            );
-$m_mtaxa = 1;
+$m_mtaxa = Bio::Homology::InterologWalk::Scores::compute_multiple_taxa_mean(
+                                                            ds_size   => 15,          
+                                                            #size: ideally it should be comparable to the dataset size
+                                                            ds_number => 2,           
+                                                            #max is currently 7, equal to the number of taxa with significant amount of data
+                                                            datadir   => $work_dir
+                                                            );
 if ( !$m_mtaxa ) {
     print "There were errors. Stopping..\n";
     exit;
