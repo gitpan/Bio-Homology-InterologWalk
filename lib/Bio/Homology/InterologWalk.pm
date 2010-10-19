@@ -19,7 +19,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 
 #################### main pod documentation begins ###################
@@ -30,7 +30,7 @@ Bio::Homology::InterologWalk - Retrieve, score and visualize putative Protein-Pr
 
 =head1 VERSION
 
-This document describes version 0.08 of Bio::Homology::InterologWalk released October 7th, 2010
+This document describes version 0.09 of Bio::Homology::InterologWalk released October 19th, 2010
 
 =head1 SYNOPSIS
 
@@ -2294,12 +2294,14 @@ sub _process_homologies{
                $DF_orthologue_id = $homology_member->stable_id;
                next if(!$DF_orthologue_id);
                #my $mid = $homology_member->get_longest_peptide_Member->member_id; OBSOLETE
-               my $mid = $homology_member->get_canonical_peptide_Member->member_id; #USE WITH V. > 57
-               
-               if($DF_orthologue_id eq $init_id){ #node_x will contain the one I started with
-                    $node_x = $pt_adaptor->fetch_AlignedMember_by_member_id_root_id($mid,1);
-               }else{
-                    $node_y = $pt_adaptor->fetch_AlignedMember_by_member_id_root_id($mid,1);
+               my $canonical_pep_member = $homology_member->get_canonical_peptide_Member;
+               if($canonical_pep_member){
+                    my $mid = $canonical_pep_member->member_id;
+                    if($DF_orthologue_id eq $init_id){ #node_x will contain the one I started with
+                         $node_x = $pt_adaptor->fetch_AlignedMember_by_member_id_root_id($mid,1);
+                    }else{
+                         $node_y = $pt_adaptor->fetch_AlignedMember_by_member_id_root_id($mid,1);
+                    } 
                }
           }
                     
@@ -3233,9 +3235,9 @@ sub compute_multiple_taxa_mean{
      my $rand = "Rand_";
      my $registry = 'Bio::EnsEMBL::Registry';
      $registry->load_registry_from_db(
-               -host          => 'ensembldb.ensembl.org',
-               -user          => 'anonymous',
-               );
+          -host          => 'ensembldb.ensembl.org',
+          -user          => 'anonymous',
+     );
      
      #first generate datasets
      my @selected_taxa;
@@ -3300,7 +3302,8 @@ sub compute_multiple_taxa_mean{
           #===========================================
           $out_path = $dataset_dir . $rand . $NCBItaxon->short_name . ".out01";
           #I have the dataset, I'll do the full interolog walk on it and also compute its mean taxa score
-          my $RC1 = Bio::Homology::InterologWalk::get_forward_orthologies(registry          => $registry,
+          my $RC1 = Bio::Homology::InterologWalk::get_forward_orthologies(
+                                                registry          => $registry,
                                                 ensembl_db        => 'multi',
                                                 input_path        => $gene_data_path,
                                                 output_path       => $out_path,
@@ -3312,11 +3315,13 @@ sub compute_multiple_taxa_mean{
           }
           $in_path = $out_path;
           $out_path = $dataset_dir . $rand . $NCBItaxon->short_name . ".out02";
-          my $dbh = Bio::Homology::InterologWalk::_setup_dbi_connection($in_path);
           my $url = "http://www.ebi.ac.uk/Tools/webservices/psicquic/intact/webservices/current/";
-          my $RC2 = Bio::Homology::InterologWalk::get_interactions(input_path    => $in_path,
+          my $RC2 = Bio::Homology::InterologWalk::get_interactions(
+                                         input_path    => $in_path,
                                          output_path   => $out_path,
                                          url           => $url,
+                                         exp_only      => 1,
+                                         physical_only => 1,
                                          );
           if(!$RC2){
                print "compute_multiple_taxa_mean(): get_interactions() returned errors. Stopping..\n";
@@ -3325,7 +3330,8 @@ sub compute_multiple_taxa_mean{
           unlink $in_path;
           $in_path = $out_path;
           $out_path = $dataset_dir . $rand . $NCBItaxon->short_name . ".out03";
-          my $RC3 = Bio::Homology::InterologWalk::get_backward_orthologies(registry     => $registry,
+          my $RC3 = Bio::Homology::InterologWalk::get_backward_orthologies(
+                                                 registry     => $registry,
                                                  ensembl_db   => 'multi',
                                                  input_path   => $in_path,
                                                  output_path  => $out_path,
@@ -3338,7 +3344,8 @@ sub compute_multiple_taxa_mean{
           unlink $in_path;
           $in_path = $out_path;
           $out_path = $dataset_dir . $rand . $NCBItaxon->short_name . ".out04";
-          my $RC4 = Bio::Homology::InterologWalk::remove_duplicate_rows(input_path    => $in_path,
+          my $RC4 = Bio::Homology::InterologWalk::remove_duplicate_rows(
+                                              input_path    => $in_path,
                                               output_path   => $out_path,
                                               header        => 'standard',
                                               );
@@ -3349,7 +3356,8 @@ sub compute_multiple_taxa_mean{
           unlink $in_path;
           $in_path = $out_path;
           $out_path = $dataset_dir . $rand . $NCBItaxon->short_name . ".out";
-          my $RC5 = Bio::Homology::InterologWalk::do_counts(input_path    => $in_path,
+          my $RC5 = Bio::Homology::InterologWalk::do_counts(
+                                  input_path    => $in_path,
                                   output_path   => $out_path,
                                   header        => 'standard',
                                   );
@@ -3359,10 +3367,16 @@ sub compute_multiple_taxa_mean{
           }
           unlink $in_path;
           $in_path = $out_path;
-          $dbh = Bio::Homology::InterologWalk::_setup_dbi_connection($in_path);                                                         
-          $partial_score = Bio::Homology::InterologWalk::Scores::_get_multiple_taxa_mean_score($dbh);
+          my $dbh_score = Bio::Homology::InterologWalk::_setup_dbi_connection($in_path);                                                         
+          $partial_score = Bio::Homology::InterologWalk::Scores::_get_multiple_taxa_mean_score($dbh_score);
           push(@scores, $partial_score) if($partial_score);
-          $dbh->disconnect;
+          $dbh_score->disconnect;
+          $registry->clear();
+                    $registry->load_registry_from_db(
+          -host          => 'ensembldb.ensembl.org',
+          -user          => 'anonymous',
+          );
+          $NCBI_taxon_adaptor = $registry->get_adaptor("Multi", "compara", "NCBITaxon");
      }
      $SCORE = _average(\@scores);
      return $SCORE;
