@@ -6,8 +6,8 @@ use Bio::Homology::InterologWalk;
 my $sourceorg = 'Mus musculus';
 my $destorg = 'all';
 my $url = "http://www.ebi.ac.uk/Tools/webservices/psicquic/intact/webservices/current/"; 
-my $test_data_dir = 't/testdata/';
-my $ont_path   = 'scripts/Data/psi-mi.obo';
+my $test_data_dir = "t/testdata/";
+my $ont_path   = "scripts/Data/psi-mi.obo";
 
 
 require_ok('Bio::Perl');
@@ -33,8 +33,8 @@ diag("Testing interfaces to remote services..Please be patient..\n\n");
 
 
 my %adaptor_options = (            
-            'Ensembl_Vertebrates'    =>   ['multi'   , 'Mus musculus'           ],
-            'Ensembl_Genomes_Metazoa' =>  ['metazoa' , 'Caenorhabditis elegans' ],            
+            'Ensembl_Vertebrates'    =>   ['ensembl'   , 'Mus musculus'           ],
+            'Ensembl_Genomes_Metazoa' =>  ['ensemblgenomes' , 'Caenorhabditis elegans' ],            
             'Ensembl_Multiple'       =>   ['all'     , 'Drosophila melanogaster'],
 );
 
@@ -62,7 +62,7 @@ while (my ($key, $value) = each(%adaptor_options)){
 
 
 my $registry = Bio::Homology::InterologWalk::setup_ensembl_adaptor(
-                                                   connect_to_db    => 'multi',
+                                                   connect_to_db    => 'ensembl',
                                                    source_org       => 'Mus musculus',
                                                    dest_org         => 'all',
                                                    );
@@ -83,6 +83,7 @@ ok( defined $rc_1,            "get_direct_interactions() return value appears to
 $out_path = $test_data_dir . "mmus.test2";
 my $rc_2 = Bio::Homology::InterologWalk::get_forward_orthologies(
                                                  registry        => $registry,
+                                                 ensembl_db      => 'ensembl',
                                                  input_path      => $in_path,
                                                  output_path     => $out_path,
                                                  source_org      => $sourceorg,
@@ -106,6 +107,7 @@ $in_path = $out_path;
 $out_path = $test_data_dir . "mmus.test4";
 my $rc_4 = Bio::Homology::InterologWalk::get_backward_orthologies(
                                                   registry      => $registry,
+                                                  ensembl_db    => 'ensembl',
                                                   input_path    => $in_path,
                                                   output_path   => $out_path,
                                                   source_org    => $sourceorg,

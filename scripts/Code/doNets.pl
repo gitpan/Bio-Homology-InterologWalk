@@ -63,7 +63,7 @@ else {
 #==================================================================
 
 
-my $ensembl_db = 'all';
+my $ensembl_db = 'ensembl';
 my $registry = Bio::Homology::InterologWalk::setup_ensembl_adaptor(
                                                   connect_to_db => $ensembl_db,
                                                   source_org    => $sourceorg

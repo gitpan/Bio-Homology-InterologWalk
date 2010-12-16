@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Bio-Homology-InterologWalk
-version:            0.09
+version:            0.11
 abstract:           Retrieve, score and visualize putative Protein-Protein Interactions through the orthology-walk method
 author:
     - Giuseppe Gallone <ggallone@cpan.org>

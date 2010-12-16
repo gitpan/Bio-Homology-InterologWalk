@@ -50,12 +50,12 @@ $infilename =~ s/(.*)\..*/$1/;
 my $out_filename = $Bio::Homology::InterologWalk::VERSIONEX . $infilename . $Bio::Homology::InterologWalk::INTACTEX0;
 $out_path = $work_dir . $out_filename;
 
-my $ensembl_db = 'all';
+my $ensembl_db = 'ensembl';
 #get an ensembl connection.
 my $registry = Bio::Homology::InterologWalk::setup_ensembl_adaptor(
                                                    connect_to_db   => $ensembl_db,
                                                    source_org      => $sourceorg,
-                                                   verbose         => 0
+                                                   verbose         => 1
                                                    );
 if(!$registry){
     print "\nThere were problems setting up the connection to Ensembl. Aborting..\n";
@@ -75,7 +75,7 @@ my $RC1 = Bio::Homology::InterologWalk::Direct::get_direct_interactions(
                                                     url                 => $url,
                                                     check_ids           => 1,     
                                                     #the following are used to build a more complex query and filter out low quality interactions
-                                                    no_spoke            => 1, #
+                                                    #no_spoke            => 1, #
                                                     exp_only            => 1, #
                                                     physical_only       => 1, #
                                                     );                                                          

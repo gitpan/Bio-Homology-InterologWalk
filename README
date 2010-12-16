@@ -1,17 +1,17 @@
-Bio-Homology-InterologWalk version 0.09
+Bio-Homology-InterologWalk version 0.11
 =======================================
 
-This document refers to version 0.09 of Bio::Homology::InterologWalk.
-This version was released October 19th, 2010.
+This document refers to version 0.11 of Bio::Homology::InterologWalk.
+This version was released December 16th, 2010.
 
 INSTALLATION-------------------------------------------------------------------------
 
 To install this module on your system, place the tarball archive file in a 
 temporary directory and call the following:
 
-% gunzip Bio-Homology-InterologWalk-0.09.tar.gz
-% tar xf Bio-Homology-InterologWalk-0.09.tar
-% cd Bio-Homology-InterologWalk-0.09
+% gunzip Bio-Homology-InterologWalk-0.11.tar.gz
+% tar xf Bio-Homology-InterologWalk-0.11.tar
+% cd Bio-Homology-InterologWalk-0.11
 % perl Makefile.PL
 % make
 % make test
@@ -110,8 +110,8 @@ The Ensembl project is currently branched in two sub-projects:
     "ensembl-variation", "ensembl-functgenomics") are required. 
 
     NOTE 2: The
-    module has been tested on Ensembl Vertebrates API & DB v. 58 and v. 59
-    and EnsemblGenomes API & DB v. 5 (58).
+    module has been tested on Ensembl Vertebrates API & DB v. 58-60 
+    and EnsemblGenomes API & DB v. 5-7.
 
 EXAMPLE==========================================
 e.g. to install API CORE V.58, do the following:
@@ -165,7 +165,7 @@ the module. The meaning of the files is as follows:
                             
 REQUIRES: doInterologWalk.pl getDirectInteractions.pl
 
--doNets.pl:    given a tsv obtained from doFlyWalk.pl (optionally, processed by doScores.pl to add a compound score column) this script will produce a .sif network file and two .noa network attribute files, suitable for importing into the Cytoscape (http://www.cytoscape.org/) network visualisation program. The files follow the definition on page http://cytoscape.org/cgi-bin/moin.cgi/Cytoscape_User_Manual/Network_Formats and have been tested on Cytoscape v. 2.6.2 / 2.6.3
+-doNets.pl:    given a tsv obtained from doFlyWalk.pl (optionally, processed by doScores.pl to add a compound score column) this script will produce a .sif network file and two .noa network attribute files, suitable for importing into the Cytoscape (http://www.cytoscape.org/) network visualisation program. The files follow the definition on page http://cytoscape.org/cgi-bin/moin.cgi/Cytoscape_User_Manual/Network_Formats and have been tested on Cytoscape v. 2.6.2 - 2.7.0
 
 REQUIRES: doInterologWalk.pl
 OPTIONAL: doScores.pl

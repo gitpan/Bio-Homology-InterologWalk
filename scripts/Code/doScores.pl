@@ -129,6 +129,9 @@ my $intact_url = "http://www.ebi.ac.uk/Tools/webservices/psicquic/intact/webserv
 #PLEASE REMOVE if performances severely affected,
 #or set "max_nodes" to a smaller value
 #-------------------------------------------------
+
+#set up url
+my $intact_url = "http://www.ebi.ac.uk/Tools/webservices/psicquic/intact/webservices/current/";
 #5) compute Conservation Score, stored in separate column
 print "\n\n";
 print colored ( "Computing PPI conservation score...", 'green' ), "\n";

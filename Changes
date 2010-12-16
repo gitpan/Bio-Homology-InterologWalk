@@ -1,5 +1,16 @@
 Revision history for Perl extension Bio::Homology::InterologWalk.
 
+0.11  Thu Dec 16 11:45:26 2010
+        - InterologWalk.pm: introduced look-up table for Genomes Taxa
+        - changed db names throughout for better readability
+        - setup_ensembl_adaptor(): fixed pan_homology bug
+        - setup_ensembl_adaptor(): removed 'default' db
+        - get_forward_orthologies(): updated docs
+        - get_forward_orthologies(): introduced genome name check when taxon id fails
+        - get_backward_orthologies(): updated docs
+        - get_backward_orthologies(): introduced genome name check when taxon id fails
+        - process_homologies(): introduced protein adaptor check
+
 0.09  Tue Oct 19 18:45:26 2010
         - fixed undefined canonical peptide member bug in _process_homologies()
         - fixed registry timeout bug in compute_multiple_taxa_mean()

@@ -22,6 +22,10 @@ my $out_path;
 my $err_path;
 my $work_dir = '../Data/';
 
+my $start_run;
+my $end_run;
+my $run_time;
+
 my $infilename;
 my $sourceorg;
 my $destorg;
@@ -41,7 +45,6 @@ if(!$infilename){
      print "Using input file: $infilename\n";
 }
 if(!$sourceorg){
-     #$sourceorg = 'Drosophila melanogaster';
      $sourceorg = 'Mus musculus';
      #$sourceorg = 'Caenorhabditis elegans';
      print "doInterologyWalk.pl: no source organism specified..Using default: $sourceorg..\n";
@@ -72,12 +75,11 @@ my $out_filename = $Bio::Homology::InterologWalk::VERSIONEX . $infilename . $Bio
 $out_path = $work_dir . $out_filename;
 
 #Ensembl dbs to connect to. Options: 
-#a) multi: vertebrate compara
+#a) ensembl: vertebrate compara
 #b) pan_homology: pan homology db
-#c) metazoa: ensembl compara genomes
-#d) all: ensembl compara vertebrates + ensembl compara metazoa
-#if no argument is provided, default is multi
-my $ensembl_db = 'all';
+#c) ensemblgenomes: ensembl compara genomes. To query:
+#d) all: ensembl compara vertebrates + ensembl genomes
+my $ensembl_db = 'ensembl';
 
 #1) set up the Ensembl compara connection
 my $registry = Bio::Homology::InterologWalk::setup_ensembl_adaptor(
@@ -97,7 +99,7 @@ if($ensembl_db eq "all"){
 }else{
      print  colored ("\nRetrieving source organism orthologs from Ensembl Compara ($ensembl_db database)...\n", 'green');
 }
-my $start_run = time;
+$start_run = time;
 my $RC1 = Bio::Homology::InterologWalk::get_forward_orthologies(
                                                 registry      => $registry,
                                                 ensembl_db    => $ensembl_db,
@@ -111,12 +113,14 @@ if(!$RC1){
      print "There were errors. Stopping..\n";
      exit;
 }
-my $end_run = time;
-my $run_time = $end_run - $start_run;                                 
+$end_run = time;
+$run_time = $end_run - $start_run;                                 
 print "*FINISHED* Job took $run_time seconds";
 
-#reset file paths. Former output is new input
+#reset the registry (get another identical one later)
+$registry->clear();
 
+#reset file paths. Former output is new input
 $in_path = $out_path;
 $out_filename = $Bio::Homology::InterologWalk::VERSIONEX . $infilename. $Bio::Homology::InterologWalk::OUTEX3; 
 $out_path = $work_dir . $out_filename;
@@ -132,8 +136,8 @@ my $RC2 = Bio::Homology::InterologWalk::get_interactions(
                                          output_path      => $out_path,
                                          url              => $url,
                                          no_spoke         => 1, 
-                                         #exp_only        => 1, 
-                                         #physical_only   => 1, 
+                                         exp_only         => 1, 
+                                         physical_only    => 1, 
                                          );
 if(!$RC2){
      print "There were errors. Stopping..\n";
@@ -150,7 +154,17 @@ my $err_filename = $Bio::Homology::InterologWalk::VERSIONEX . $infilename. $Bio:
 $out_path = $work_dir . $out_filename;
 $err_path = $work_dir . $err_filename;
 
-# 4) get backward orthologies.
+#4) get the same registry 
+$registry = Bio::Homology::InterologWalk::setup_ensembl_adaptor(
+                                                   connect_to_db   => $ensembl_db,
+                                                   source_org      => $sourceorg,
+                                                   dest_org        => $destorg,
+                                                   );
+if(!$registry){
+    print "\nThere were problems setting up the connection to Ensembl. Aborting..\n";
+    exit;
+}
+# 5) get backward orthologies.
 print "\n\n", colored ("Retrieving orthologs back in source organism from Ensembl Compara ($ensembl_db database)...", 'green'), "\n\n";
 $start_run = time;
 my $RC3 = Bio::Homology::InterologWalk::get_backward_orthologies(
@@ -169,13 +183,14 @@ if(!$RC3){
 $end_run = time;
 $run_time = $end_run - $start_run;                               
 print "*FINISHED* Job took $run_time seconds";
+$registry->clear(); 
 
 $in_path = $out_path;
 $out_filename = $Bio::Homology::InterologWalk::VERSIONEX . $infilename. $Bio::Homology::InterologWalk::OUTEX5;
 $out_path = $work_dir . $out_filename;
 
 
-# 5) Intact sometimes returns duplicate rows. This method will remove them
+# 6) Intact sometimes returns duplicate rows. This method will remove them
 print "\n\n", colored ("Getting rid of duplicate rows if any...", 'green'), "\n\n";
 my $RC4 = Bio::Homology::InterologWalk::remove_duplicate_rows(
                                               input_path   => $in_path,
@@ -190,7 +205,7 @@ $in_path = $out_path;
 $out_filename = $Bio::Homology::InterologWalk::VERSIONEX . $infilename. $Bio::Homology::InterologWalk::OUTEX6;
 $out_path = $work_dir . $out_filename;
 
-# 6) do counts and add further columns with indicators useful for scoring the data
+# 7) do counts and add further columns with indicators useful for scoring the data
 print "\n\n", colored ("Gathering counts for score purposes...", 'green'), "\n\n";
 my $RC5 = Bio::Homology::InterologWalk::do_counts(
                                   input_path  => $in_path,
@@ -207,7 +222,7 @@ $out_filename = $Bio::Homology::InterologWalk::VERSIONEX . $infilename. $Bio::Ho
 $out_path = $work_dir . $out_filename;
 
 
-# 7) create a file containing all the new ids discovered (ids not present in the starting set)
+# 8) create a file containing all the new ids discovered (ids not present in the starting set)
 print "\n\n", colored ("Counting the number of new ids we got...", 'green'), "\n\n";
 my $RC6 = Bio::Homology::InterologWalk::extract_unseen_ids(
                                            start_path     => $start_data_path,
@@ -219,6 +234,5 @@ if(!$RC6){
      print "There were errors. Stopping..\n";
      exit;
 }    
-
-$registry->clear();                                                                                                             
+                                                                                                           
 print "\n\n", colored ("**FINISHED**", 'green'), "\n\n";                                                                          
