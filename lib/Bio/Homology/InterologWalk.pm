@@ -19,7 +19,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 
 #################### main pod documentation begins ###################
@@ -30,7 +30,7 @@ Bio::Homology::InterologWalk - Retrieve, score and visualize putative Protein-Pr
 
 =head1 VERSION
 
-This document describes version 0.11 of Bio::Homology::InterologWalk released December 16th, 2010
+This document describes version 0.12 of Bio::Homology::InterologWalk released January 12th, 2011
 
 =head1 SYNOPSIS
 

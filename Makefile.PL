@@ -129,7 +129,7 @@ if ($missing_required_packages){
 Required modules/packages are missing. Install these first.
 
 EOT
-    exit 1;
+    exit 0;
 }
 
 

@@ -1,5 +1,9 @@
 Revision history for Perl extension Bio::Homology::InterologWalk.
 
+0.12  Wed Jan 12 12:07:01 2011
+        - Modified Makefile.PL  to avoid failing tests when prerequisite
+          software on testers' machines is missing
+
 0.11  Thu Dec 16 11:45:26 2010
         - InterologWalk.pm: introduced look-up table for Genomes Taxa
         - changed db names throughout for better readability

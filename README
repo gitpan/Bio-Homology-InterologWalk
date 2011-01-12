@@ -1,17 +1,17 @@
-Bio-Homology-InterologWalk version 0.11
+Bio-Homology-InterologWalk version 0.12
 =======================================
 
-This document refers to version 0.11 of Bio::Homology::InterologWalk.
-This version was released December 16th, 2010.
+This document refers to version 0.12 of Bio::Homology::InterologWalk.
+This version was released January 12th, 2011.
 
 INSTALLATION-------------------------------------------------------------------------
 
 To install this module on your system, place the tarball archive file in a 
 temporary directory and call the following:
 
-% gunzip Bio-Homology-InterologWalk-0.11.tar.gz
-% tar xf Bio-Homology-InterologWalk-0.11.tar
-% cd Bio-Homology-InterologWalk-0.11
+% gunzip Bio-Homology-InterologWalk-0.12.tar.gz
+% tar xf Bio-Homology-InterologWalk-0.12.tar
+% cd Bio-Homology-InterologWalk-0.12
 % perl Makefile.PL
 % make
 % make test
@@ -181,7 +181,7 @@ Original author:  Giuseppe Gallone
 CPAN ID: GGALLONE
 G.Gallone@sms.ed.ac.uk
 
-Copyright (C) 2010 by Giuseppe Gallone
+Copyright (C) 2010-2011 by Giuseppe Gallone
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
 
