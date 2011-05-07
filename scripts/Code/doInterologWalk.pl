@@ -175,6 +175,7 @@ my $RC3 = Bio::Homology::InterologWalk::get_backward_orthologies(
                                                  error_path     => $err_path,
                                                  source_org     => $sourceorg, 
                                                  hq_only        => $onetoone,
+                                                 #check_ids      => 1,
                                                  );
 if(!$RC3){
      print "There were errors. Stopping..\n";

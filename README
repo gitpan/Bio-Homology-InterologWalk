@@ -1,17 +1,17 @@
-Bio-Homology-InterologWalk version 0.12
-=======================================
+Bio-Homology-InterologWalk version 0.501
+========================================
 
-This document refers to version 0.12 of Bio::Homology::InterologWalk.
-This version was released January 12th, 2011.
+This document refers to version 0.501 of Bio::Homology::InterologWalk.
+This version was released May 7th, 2011.
 
 INSTALLATION-------------------------------------------------------------------------
 
 To install this module on your system, place the tarball archive file in a 
 temporary directory and call the following:
 
-% gunzip Bio-Homology-InterologWalk-0.12.tar.gz
-% tar xf Bio-Homology-InterologWalk-0.12.tar
-% cd Bio-Homology-InterologWalk-0.12
+% gunzip Bio-Homology-InterologWalk-0.501.tar.gz
+% tar xf Bio-Homology-InterologWalk-0.501.tar
+% cd Bio-Homology-InterologWalk-0.501
 % perl Makefile.PL
 % make
 % make test
@@ -109,21 +109,20 @@ The Ensembl project is currently branched in two sub-projects:
     NOTE 1: All the API components ("ensembl", "ensembl-compara",
     "ensembl-variation", "ensembl-functgenomics") are required. 
 
-    NOTE 2: The
-    module has been tested on Ensembl Vertebrates API & DB v. 58-60 
+    NOTE 2: The module has been tested on Ensembl Vertebrates API & DB v. 58-61 
     and EnsemblGenomes API & DB v. 5-7.
 
 EXAMPLE==========================================
-e.g. to install API CORE V.58, do the following:
+e.g. to install API CORE V.61, do the following:
 
 log into the Ensembl CVS server at Sanger (using password: CVSUSER):
 
 $ cvs -d :pserver:cvsuser@cvs.sanger.ac.uk:/cvsroot/ensembl login
 Logging in to :pserver:cvsuser@cvs.sanger.ac.uk:2401/cvsroot/ensembl
 CVS password: CVSUSER
-Install the Ensembl Core Perl API for version 58
+Install the Ensembl Core Perl API for version 61
 
-$ cvs -d :pserver:cvsuser@cvs.sanger.ac.uk:/cvsroot/ensembl checkout -r branch-ensembl-58 ensembl
+$ cvs -d :pserver:cvsuser@cvs.sanger.ac.uk:/cvsroot/ensembl checkout -r branch-ensembl-61 ensembl
 
 =====================
 3. EXTRA PERL MODULES
@@ -157,7 +156,7 @@ SAMPLE SCRIPS-------------------------------------------------------------------
 The scripts/Code sub-directory provide an example for the usage of 
 the module. The meaning of the files is as follows:
 
--doInterologWalk.pl:  example usage of the core methods: given a flat file containing a list of stable flybase ids, this script will use Bio::Homology::InterologWalk to build a TSV file containing the putative interactors of such ids according to the interolog mapping method.
+-doInterologWalk.pl:  example usage of the core methods: given a flat file containing a list of stable Ensembl mouse IDs, this script will use Bio::Homology::InterologWalk to build a TSV file containing the putative interactors of such ids according to the interolog mapping method.
 
 -getDirectInteractions.pl:  generate a dataset of direct PPIs based on the input ID list
 

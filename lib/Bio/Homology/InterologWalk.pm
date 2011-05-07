@@ -4,6 +4,9 @@ use 5.008006;
 use strict;
 use warnings;
 
+use String::Approx 'amatch';
+use Carp qw(croak);
+
 use Bio::EnsEMBL::Registry;
 use REST::Client;
 use GO::Parser;
@@ -19,7 +22,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
-our $VERSION = '0.12';
+our $VERSION = '0.501';
 
 
 #################### main pod documentation begins ###################
@@ -30,26 +33,27 @@ Bio::Homology::InterologWalk - Retrieve, score and visualize putative Protein-Pr
 
 =head1 VERSION
 
-This document describes version 0.12 of Bio::Homology::InterologWalk released January 12th, 2011
+This document describes version 0.501 of Bio::Homology::InterologWalk released May 7th, 2011
 
 =head1 SYNOPSIS
 
   use Bio::Homology::InterologWalk;
 
-First, obtain experimental PPIs for the dataset (see example in C<getDirectInteractions.pl>):
+First, obtain Intact Interactions for the dataset (see example in C<getDirectInteractions.pl>):
 
 
-  #e.g. get a registry from Ensembl using the fruit fly
+  #get a registry from Ensembl
   my $registry = Bio::Homology::InterologWalk::setup_ensembl_adaptor(
-                                                     connect_to_db  => 'ensembl',
-                                                     source_org     => 'Drosophila melanogaster'
+                                                     connect_to_db  => $ensembl_db,
+                                                     source_org     => $sourceorg,
+                                                     verbose        => 1
                                                      );
   
   
-  #query experimental interactions
-  $RC = Bio::Homology::InterologWalk::Direct::get_direct_interactions(
+  #query direct interactions
+  $RC = Bio::Homology::InterologWalk::get_direct_interactions(
                                                       registry         => $registry,
-                                                      source_org       => 'Drosophila melanogaster',
+                                                      source_org       => $sourceorg,
                                                       input_path       => $in_path,
                                                       output_path      => $out_path,
                                                       url              => $url,
@@ -66,11 +70,11 @@ get orthologues of starting set:
 
   $RC = Bio::Homology::InterologWalk::get_forward_orthologies(
                                               registry        => $registry,
-                                              ensembl_db      => 'ensembl',
+                                              ensembl_db      => $ensembl_db,
                                               input_path      => $in_path,
                                               output_path     => $out_path,
-                                              source_org      => 'Drosophila melanogaster',
-                                              dest_org        => 'all',
+                                              source_org      => $sourceorg,
+                                              dest_org        => $destorg,
                                               );
 
 
@@ -90,11 +94,11 @@ add orthologues of interactors found by C<get_interactions()>:
 
   $RC = Bio::Homology::InterologWalk::get_backward_orthologies(
                                                registry    => $registry,
-                                               ensembl_db  => 'ensembl',
+                                               ensembl_db  => $ensembl_db,
                                                input_path  => $in_path,
                                                output_path => $out_path,
                                                error_path  => $err_path,
-                                               source_org  => 'Drosophila melanogaster',  
+                                               source_org  => $sourceorg,  
                                                );
 
 do some postprocessing (see L</remove_duplicate_rows>, L</do_counts>, L</extract_unseen_ids>)
@@ -120,7 +124,7 @@ get some networks and network attributes which you can then visualise with cytos
                                            registry    => $registry,
                                            data_file   => $infilename, 
                                            data_dir    => $work_dir,
-                                           source_org  => 'Drosophila melanogaster',
+                                           source_org  => $sourceorg,
                                            );                                        
                                                
    $RC = Bio::Homology::InterologWalk::Networks::do_attributes(
@@ -128,12 +132,13 @@ get some networks and network attributes which you can then visualise with cytos
                                            data_file   => $infilename,
                                            start_file  => $startfilename,
                                            data_dir    => $work_dir,
-                                           source_org  => 'Drosophila melanogaster',
+                                           source_org  => $sourceorg,
                                            );
 
 I<The synopsis above only lists the major methods and parameters.>
 
 =head1 DESCRIPTION
+
 
 
 A common activity in computational biology is to mine protein-protein interactions 
@@ -217,7 +222,7 @@ to find orthologues back in the original species of interest. It will also adds 
 =back
 
 The output of this sequence of subroutines will be a TSV file containing zero or more entries, closely resembling  the MITAB tab delimited data exchange format from the  HUPO PSI (Proteomics Standards Initiative).
-Each row in the data file represents a binary putative interaction, plus currently 37 supplementary data fields.
+Each row in the data file represents a binary putative interaction, plus currently 39 supplementary data fields.
 
 This basic output can then be further processed with the help of other methods in the module: one can scan the results to compute counts, 
 to check for duplicates, to verify the presence of new gene ids that were not present in the original dataset and save them in another datafile, and so on.
@@ -314,8 +319,8 @@ The module requests that
 
 Ensembl API Version == Ensembl-DB set version. 
 
-This means that if you install e.g. API V.58, 
-you will only be able to get data from Ensembl Vertebrates / Metazoa databases V. 58. As the EnsemblGenomes DB releases are 
+This means that if you install e.g. API V.61, 
+you will only be able to get data from Ensembl Vertebrates / Metazoa databases V. 61. As the EnsemblGenomes DB releases are 
 B<one version behind> the Ensembl Vertebrate DB release, if you install the bleeding-edge Ensembl Vertebrate API, I<a matching EnsemblGenomes DB release might
 not be available yet>: you will still be able to use C<Bio::Homology::InterologWalk> to run an orthology walk using exclusively Ensembl Vertebrate DBs, but you
 will get an error if you try to choose metazoan databases. See L</setup_ensembl_adaptor> for further information.
@@ -359,7 +364,7 @@ Option (b) is the B<recommended> one.
 
 NOTE 1: All the API components  (C<ensembl>, C<ensembl-compara>, C<ensembl-variation>, C<ensembl-functgenomics>) are required.
 
-NOTE 2: The module has been tested on Ensembl Vertebrates API & DB v. 58 - 60 and EnsemblGenomes API & DB  v. 5 - 7. 
+NOTE 2: The module has been tested on Ensembl Vertebrates API & DB v. 58-61 and EnsemblGenomes API & DB  v. 5-7. 
 
 =head2 Bioperl
 
@@ -445,6 +450,8 @@ my $FN_acc_numb_a             =    'ACCESSION_NUMBER_A';
 my $FN_acc_numb_b             =    'ACCESSION_NUMBER_B';
 my $FN_alt_id_a               =    'ALT_ID_A';
 my $FN_alt_id_b               =    'ALT_ID_B';
+my $FN_props_a                =    'PROPERTIES_A';#new
+my $FN_props_b                =    'PROPERTIES_B';
 my $FN_name_a                 =    'NAME_A'; 
 my $FN_name_b                 =    'NAME_B';
 my $FN_taxon_a                =    'TAXON_A';
@@ -455,7 +462,9 @@ my $FN_det_method             =    'DET_METHOD';
 my $FN_exp_method             =    'EXP_METHOD';
 
 my $HEADER_INT = join("\t", $FN_interaction_id, $FN_acc_numb_a, $FN_acc_numb_b,
-                            $FN_alt_id_a, $FN_alt_id_b, $FN_name_a, $FN_name_b,
+                            $FN_alt_id_a, $FN_alt_id_b,
+                            $FN_props_a, $FN_props_b, 
+                            $FN_name_a, $FN_name_b,
                             $FN_taxon_a, $FN_taxon_b, $FN_pub, $FN_int_type,
                             $FN_det_method, $FN_exp_method);
 
@@ -513,7 +522,6 @@ my %ensembl_db_lookup = (
 			                        'protists'],
             'pan_homology'    => 'pan_homology',
             
-            'Acyrthosiphon'     => 'metazoa',
             'Aedes'             => 'metazoa',
             'Anopheles'         => 'metazoa',
             'Caenorhabditis'    => 'metazoa',
@@ -526,11 +534,9 @@ my %ensembl_db_lookup = (
             'Arabidopsis'     => 'plants',
             'Brachypodium'    => 'plants',
             'Oryza'           => 'plants',
-            'Physcomitrella'  => 'plants',
             'Populus'         => 'plants',
             'Sorghum'         => 'plants',
             'Vitis'           => 'plants',
-            'Zea'             => 'plants',
             
             'Plasmodium'      => 'protists',
             'Thalassiosira'   => 'protists',
@@ -541,7 +547,6 @@ my %ensembl_db_lookup = (
             'Neosartorya'          => 'fungi',
             'Neurospora '          => 'fungi',
             'Saccharomyces'        => 'fungi',
-            'Puccinia'             => 'fungi',
             'Schizosaccharomyces ' => 'fungi',
             
             'Bacillus'         => 'bacteria',
@@ -570,13 +575,14 @@ my %ensembl_db_lookup = (
              a species-dependent adaptor out of it
  Returns   : An Ensembl Registry object if successful, undefined in all other cases
  Argument  : -connect_to_db: ensembl db to connect to. Choices currently are:
-                 a. 'ensembl' :  vertebrate compara (see http://www.ensembl.org/)
+                 a. 'multi' :  vertebrate compara (see http://www.ensembl.org/)
                  b. 'pan_homology' : pan taxonomic compara db, a selection of species from both 
                     Ensembl Compara and EnsemblGenomes Compara
                     (see http://nar.oxfordjournals.org/cgi/content/full/38/suppl_1/D563 )
                  c. 'ensemblgenomes' : EnsemblGenomes compara db 
                     (see http://metazoa.ensembl.org/index.html). 
-                 d. 'all'  : ensembl + ensemblgenomes.
+                 d. 'all'  : multi + ensemblgenomes.
+                 Default is 'multi'.
              -source_org: the initial species for the interolog walk. This MUST match with your 
               choice of db. Exception is raised if not
              -(OPTIONAL) dest_org: the destination species to use for the interolog walk. This 
@@ -823,13 +829,14 @@ sub remove_duplicate_rows{
  Returns   : success/error code
  Argument  : -registry object to connect to ensembl
              -ensembl db to connect to. Choices currently are:
-                 a. 'ensembl' :  vertebrate compara (see http://www.ensembl.org/)
-                 b. 'pan_homology' : pan taxonomic compara db, a selection of species from both 
-                    Ensembl Compara and EnsemblGenomes Compara
+                 a. 'multi' :  vertebrate compara (see http://www.ensembl.org/)
+                 b. 'pan_homology' : pan taxonomic compara db, a selection of species 
+                    from both Ensembl Compara and Ensembl Genomes 
                     (see http://nar.oxfordjournals.org/cgi/content/full/38/suppl_1/D563 )
-                 c. 'ensemblgenomes' : EnsemblGenomes compara db 
+                 c. 'metazoa' : ensembl compara genomes, metazoa db 
                     (see http://metazoa.ensembl.org/index.html). 
-                 d. 'all'  : ensembl + ensemblgenomes.
+                 d. 'all'  : multi + metazoa.
+                 Default is 'multi'.
              -input_path : path to input file. Input file MUST be a text file with one entry
               per row, each entry containing an up-to-date gene ID recognised by the Ensembl 
               consortium (http://www.ensembl.org/) followed by a new line char.
@@ -902,12 +909,42 @@ sub get_forward_orthologies{
      my $binomial_species = lc $sourceorg;
      $binomial_species =~ s/\s+/\_/;
      
-     #MANAGE FILES
+     #MANAGE FILES--------------
      open (my $in_data,  q{<}, $in_path) or croak("Unable to open $in_path : $!");
-     open (my $out_data,  q{>}, $out_path) or croak("Unable to open $out_path : $!");
-     #============
-     #set up header
-     print $out_data $HEADER_FWD_ORTH, "\n";
+     my $out_data;
+     my $lastID;
+     if (-e $out_path){# if there's already an output file written
+          open ($out_data,  q{<}, $out_path) or croak("Unable to open $out_path : $!");
+          #call subroutine to:
+          #read last id from outfile
+          #find that last id in in_data
+          #start from there
+          my $line;
+          while (<$out_data>){
+               $line = $_;
+               if($line eq ''){# if there's an empty line at the end i dont want an empty element in last id
+                    last;
+               }
+               my @lineArray = split("\t",$line);
+               $lastID = $lineArray[0];
+          }
+          close $out_data; #open with append
+          open ($out_data,  q{>>}, $out_path) or croak("Unable to open $out_path : $!");
+          print $out_data "\n";
+          while (<$in_data>){
+               my $currentID = $_;
+               chomp($currentID);
+               if ($currentID eq $lastID){
+                    last;
+               }
+          }
+          print "get_forward_orthologies(): continuing from $lastID..\n";
+     }else{
+          open ($out_data,  q{>}, $out_path) or croak("Unable to open $out_path : $!");
+          #set up header
+          print $out_data $HEADER_FWD_ORTH, "\n";
+     }
+     #-----------------------------
      
      my $sg = $sourceorg;
      $sg =~ s/(\w+)(\s+)(\S+)/$1/;
@@ -919,11 +956,8 @@ sub get_forward_orthologies{
           push(@ensembl_dbs, $ensembl_db_lookup{ensembl});
      }elsif($db eq 'ensemblgenomes'){
            push(@ensembl_dbs, $ensembl_db_lookup{$sg});
-     }elsif($db eq 'pan_homology'){ #'pan_homology'
+     }else{ #'pan_homology'
            push(@ensembl_dbs, $ensembl_db_lookup{pan_homology});
-     }else{
-          print "get_forward_orthologies(): database name $db not recognised. Aborting..\n";
-          return;
      }
      
      my $source_species_gene_adaptor = $registry->get_adaptor($sourceorg, 'core', 'Gene');
@@ -957,7 +991,7 @@ sub get_forward_orthologies{
           my $source_NCBI_taxon_ID = $source_taxon->ncbi_taxid;
           
           if(!$genome_taxon_ids{$source_NCBI_taxon_ID}){ 
-          #if the genome taxon_id given to me by the taxon adaptor does not exist in this genome collection
+          #if the genome taxon_idgiven to me by the taxon adaptor does not exist in this genome collection
           #I will check the genome name
                if(!$genome_names{$binomial_species}){
                     print "get_forward_orthologies():"
@@ -1159,6 +1193,8 @@ sub get_interactions{
      my $DF_alt_id_b;
      my $DF_name_a; 
      my $DF_name_b;
+     my $DF_props_a;
+     my $DF_props_b;
      my $DF_taxon_a;
      my $DF_taxon_b;
      my $DF_pub;
@@ -1225,10 +1261,14 @@ sub get_interactions{
                next if(!$DF_interaction_id);
                $DF_acc_numb_a      = _get_interactor_uniprot_id($MITABDataRow[0]);
                $DF_acc_numb_b      = _get_interactor_uniprot_id($MITABDataRow[1]);
-               $DF_alt_id_a        = _get_interactor_aliases($MITABDataRow[2]);
-               $DF_alt_id_b        = _get_interactor_aliases($MITABDataRow[3]);
+               $DF_alt_id_a        = _get_interactor_alias_prop_list($MITABDataRow[2]);
+               $DF_alt_id_b        = _get_interactor_alias_prop_list($MITABDataRow[3]);
                $DF_name_a          = _get_interactor_name($MITABDataRow[4]);
                $DF_name_b          = _get_interactor_name($MITABDataRow[5]);
+               
+               $DF_props_a         = _get_interactor_alias_prop_list($MITABDataRow[19]);
+               $DF_props_b         = _get_interactor_alias_prop_list($MITABDataRow[20]);
+               
                $DF_taxon_a         = _get_interactor_taxon($MITABDataRow[9]);
                $DF_taxon_b         = _get_interactor_taxon($MITABDataRow[10]);
                $DF_pub             = $MITABDataRow[8];
@@ -1238,8 +1278,15 @@ sub get_interactions{
           
                print("Interaction ($DF_interaction_id): $DF_acc_numb_a <-> $DF_acc_numb_b\n") unless($no_output);
           
-               my $fullDataRow = join("\t",@oldDataVec,$DF_interaction_id,$DF_acc_numb_a,$DF_acc_numb_b,$DF_alt_id_a,$DF_alt_id_b,
-                                             $DF_name_a,$DF_name_b,$DF_taxon_a,$DF_taxon_b,$DF_pub,$DF_int_type,$DF_det_method,$DF_exp_method);
+               my $fullDataRow = join("\t",@oldDataVec,$DF_interaction_id,
+                                                       $DF_acc_numb_a, $DF_acc_numb_b,
+                                                       $DF_alt_id_a,   $DF_alt_id_b,
+                                                       $DF_props_a,    $DF_props_b,
+                                                       $DF_name_a,     $DF_name_b,
+                                                       $DF_taxon_a,    $DF_taxon_b,
+                                                       $DF_pub,        $DF_int_type,
+                                                       $DF_det_method, $DF_exp_method
+                                                       );
                print $out_data $fullDataRow, "\n";
           }
      }
@@ -1276,13 +1323,14 @@ sub get_interactions{
  Returns   : success/error
  Argument  : -registry: registry object for ensembl connection
              -ensembl db to connect to. Choices currently are:
-                 a. 'ensembl' :  vertebrate compara (see http://www.ensembl.org/)
-                 b. 'pan_homology' : pan taxonomic compara db, a selection of species from both 
-                    Ensembl Compara and EnsemblGenomes Compara
+                 a. 'multi' :  vertebrate compara (see http://www.ensembl.org/)
+                 b. 'pan_homology' : pan taxonomic compara db, a selection of species from 
+                    both Ensembl Compara and Ensembl Genomes 
                     (see http://nar.oxfordjournals.org/cgi/content/full/38/suppl_1/D563 )
-                 c. 'ensemblgenomes' : EnsemblGenomes compara db 
+                 c. 'metazoa' : ensembl compara genomes, metazoa db 
                     (see http://metazoa.ensembl.org/index.html). 
-                 d. 'all'  : ensembl + ensemblgenomes.
+                 d. 'all'  : multi + metazoa.
+                 Default is 'multi'.
              -input_path : path to input file. Input file for this subroutine is the output 
               of get_interactions().
              -output_path : where you want the routine to write the data. Data is in TSV 
@@ -1301,6 +1349,9 @@ sub get_interactions{
               after the speciation. One-to-one orthologues are ideally associated with higher 
               functional conservation (while paralogues often cause neo/sub-functionalisation). 
               For further information see
+             -(OPTIONAL) check_ids: Ensembl IDs obtained from the MITAB entry can at times be obsolete.
+              If this is set, the subroutine will check the ids against ensembl to verify they're primary.
+              If they're not, an up-to-dat id will be fetched remotely from Ensembl.
               http://www.ensembl.org/info/docs/compara/homology_method.html 
              -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output during 
               test. Default is 0.
@@ -1322,6 +1373,7 @@ sub get_backward_orthologies{
      my $out_path        = $args{output_path};
      my $err_path        = $args{error_path};
      my $onetoone_only   = $args{hq_only};
+     my $check_ids       = $args{check_ids};#optional
      my $no_output       = $args{no_output};
      
      my $out_data; 
@@ -1376,11 +1428,8 @@ sub get_backward_orthologies{
           push(@ensembl_dbs, $ensembl_db_lookup{ensembl});
      }elsif($db eq 'ensemblgenomes'){
            push(@ensembl_dbs, $ensembl_db_lookup{$sg});
-     }elsif($db eq 'pan_homology'){ #'pan_homology'
+     }else{ #'pan_homology'
            push(@ensembl_dbs, $ensembl_db_lookup{pan_homology});
-     }else{
-          print "get_forward_orthologies(): database name $db not recognised. Aborting..\n";
-          return;
      }
 
      print $err_data $HEADER_FWD_ORTH, "\t", $HEADER_INT, "\n" if($err_path);
@@ -1402,7 +1451,7 @@ sub get_backward_orthologies{
      while (my $row = $sth->fetchrow_hashref) {
           my $DF_taxon_a = $row->{$FN_taxon_a};
           my $DF_taxon_b = $row->{$FN_taxon_b};
-          #I don't want empty fields or hyphens 
+          #I don't want empty fields or hyphens or other crap
           $NCBItaxa_seen{$DF_taxon_a} = 1 if($DF_taxon_a =~ /\d+/);
           $NCBItaxa_seen{$DF_taxon_b} = 1 if($DF_taxon_b =~ /\d+/);
      }
@@ -1417,7 +1466,6 @@ sub get_backward_orthologies{
           my %genome_taxon_ids;
           my %genome_names;
           my $all_genome_dbs;
-          my $gdb2; 
           
           print("\n----Querying Ensembl Compara ($ensembl_db) for orthologues back in $sourceorg----\n") unless($no_output);
           #CHECK THE GENOME ID/DB COMBO====
@@ -1432,7 +1480,7 @@ sub get_backward_orthologies{
           my $source_NCBI_taxon_ID = $source_taxon->ncbi_taxid;
           
           my $genomedb_adaptor = $registry->get_adaptor($ensembl_db, 'compara', 'GenomeDB'); 
- 
+          my $gdb2; 
           $all_genome_dbs = $genomedb_adaptor->fetch_all();
           
           foreach my $genome (@{$all_genome_dbs}){
@@ -1447,7 +1495,21 @@ sub get_backward_orthologies{
                }
           }
           next if(!$gdb2);
-
+          #If the given species does not exist in that db, the db is  not worth examining further
+#          if(!$genome_taxon_ids{$source_NCBI_taxon_ID}){
+#               if(!$genome_names{$binomial_species}){
+#                    print "get_backward_orthologies():"
+#                    . "\n Genome name: $sourceorg ($source_NCBI_taxon_ID)"  
+#                    . "not recognised in ensembl db: $ensembl_db. Skipping this db..\n\n";
+#                    next;
+#               }
+#          }
+          
+          #destination species must be the same as start species in the forward orthology script
+#          my $gdb2;
+#          eval { local $SIG{'__DIE__'}; $gdb2 = $genomedb_adaptor->fetch_by_taxon_id($source_NCBI_taxon_ID); };     warn $@ if $@;
+          
+          #=============================
           
           #-----------------other adapters-----------------------------
           my $member_adaptor =
@@ -1489,6 +1551,7 @@ sub get_backward_orthologies{
                                    OR ($FN_taxon_a='$NCBItaxonID' AND $FN_taxon_b = '-2')
                                    OR ($FN_taxon_b='$NCBItaxonID' AND $FN_taxon_a = '-1')
                                    OR ($FN_taxon_b='$NCBItaxonID' AND $FN_taxon_a = '-2')";
+               #my $query = "SELECT * FROM int WHERE ($FN_taxon_b='$NCBItaxonID')";
                #intact uses numerical codes instead of NCBI taxon ids sometimes. To my knowledge, these are -1 and -2
                #('in vitro' and 'chemical synthesis')
                $dbh = _setup_dbi_connection($in_path);
@@ -1543,6 +1606,7 @@ sub get_backward_orthologies{
                     
                     my $candidate; my $member;
                     my $interactoridA; my $interactoridB;
+                    #my $gene_adaptor_a;
                     
                     my $DF_orthologue_id   = $row->{$FN_orthologue_id};
                     my $DF_interaction_id  = $row->{$FN_interaction_id};
@@ -1550,33 +1614,85 @@ sub get_backward_orthologies{
                     my $DF_name_b          = $row->{$FN_name_b};
                     my $DF_alt_id_a        = $row->{$FN_alt_id_a};
                     my $DF_alt_id_b        = $row->{$FN_alt_id_b}; 
+                    my $DF_props_a         = $row->{$FN_props_a};
+                    my $DF_props_b         = $row->{$FN_props_b}; 
                     my $DF_acc_numb_a      = $row->{$FN_acc_numb_a};
                     my $DF_acc_numb_b      = $row->{$FN_acc_numb_b};
+                    my $DF_taxon_a         = $row->{$FN_taxon_a};
+                    my $DF_taxon_b         = $row->{$FN_taxon_b};# this must be equal to $NCBItaxonID
                     
+                    $candidate = Bio::Homology::InterologWalk::_get_ensembl_id_from_mitab_data(
+                                                    init_id          => $DF_orthologue_id,
+                                                    acc_numb_a       => $DF_acc_numb_a,
+                                                    acc_numb_b       => $DF_acc_numb_b,
+                                                    alt_id_a         => $DF_alt_id_a,
+                                                    alt_id_b         => $DF_alt_id_b,
+                                                    name_a           => $DF_name_a,  
+                                                    name_b           => $DF_name_b,
+                                                    props_a          => $DF_props_a,
+                                                    props_b          => $DF_props_b,
+                                                    adaptor          => $gene_adaptor,
+                                                    id_check         => $check_ids                                                   
+                                                    );
+                                                    
+                    if($candidate){
+                         $member = $member_adaptor->fetch_by_source_stable_id("ENSEMBLGENE", $candidate);
+                         if(!$member){
+                              print "$DF_interaction_id-($DF_acc_numb_a, $DF_acc_numb_b): fetch_by_source_stable_id returns no member object.\n" unless($no_output);
+                              if($err_path){
+                                   print $err_data $entry, "\n";
+                                   $entries_err_found = 1;
+                              }
+                              next;     
+                         }
+                    
+                         my $all_homologies = $homology_adaptor->fetch_all_by_Member_MethodLinkSpeciesSet($member, $orthologues_mlss);
+                         next if (scalar(@$all_homologies) == 0);
+                    
+                         $orthology_count = _process_homologies(homology_query_id   =>   $candidate, 
+                                                           homology_vector     =>   $all_homologies, 
+                                                           protein_adaptor     =>   $proteintree_adaptor,
+                                                           outfile             =>   $out_data,
+                                                           datavector          =>   $entry, 
+                                                           hq_only             =>   $onetoone_only,
+                                                           no_output           =>   $no_output
+                                                           );
+                         $global_count += $orthology_count;
+                         next;
+                    }
+
+                    #If we're here, we weren't able to identify the target interactor id. We'll have to translate both
+                    print("Target ID not found through Intact Data. Translating both...\n");
                     #uniprotkb->ensemble stable id translation
                     if($DF_acc_numb_a =~ /^ENS/){
                          $interactoridA = $DF_acc_numb_a;
                     }else{
-                         $interactoridA = _get_ensembl_id(  adaptor        => $gene_adaptor, 
-                                                       ebi_id         => $DF_interaction_id, 
-                                                       ortho_id       => $DF_orthologue_id, 
-                                                       acc_numb       => $DF_acc_numb_a, 
-                                                       protein_name   => $DF_name_a, 
-                                                       aliases        => $DF_alt_id_a,
-                                                       no_output      => $no_output);
-
+                         $interactoridA = _get_ensembl_id_from_uniprotkb_id(  
+                                                        adaptor        => $gene_adaptor, 
+                                                        ebi_id         => $DF_interaction_id, 
+                                                        #ortho_id       => $DF_orthologue_id, 
+                                                        #TODO: che succede senza questo? debugga!!
+                                                        acc_numb       => $DF_acc_numb_a, 
+                                                        protein_name   => $DF_name_a, 
+                                                        aliases        => $DF_alt_id_a,
+                                                        props          => $DF_props_a
+                                                        );         
+                                                            
+                         
                     }
                     
                     if($DF_acc_numb_b =~ /^ENS/){
                          $interactoridB = $DF_acc_numb_b;
                     }else{
-                         $interactoridB = _get_ensembl_id(adaptor    => $gene_adaptor, 
-                                                        ebi_id       => $DF_interaction_id, 
-                                                        ortho_id     => $DF_orthologue_id, 
-                                                        acc_numb     => $DF_acc_numb_b, 
-                                                        protein_name => $DF_name_b, 
-                                                        aliases      => $DF_alt_id_b,
-                                                        no_output    => $no_output);
+                         $interactoridB = _get_ensembl_id_from_uniprotkb_id(
+                                                        adaptor        => $gene_adaptor, 
+                                                        ebi_id         => $DF_interaction_id, 
+                                                        #ortho_id      => $DF_orthologue_id, 
+                                                        acc_numb       => $DF_acc_numb_b, 
+                                                        protein_name   => $DF_name_b, 
+                                                        aliases        => $DF_alt_id_b,
+                                                        props          => $DF_props_b
+                                                        );
                     }
 
                
@@ -1596,27 +1712,29 @@ sub get_backward_orthologies{
                          }else{
                               print("\nWARNING id mismatch between $DF_orthologue_id, $interactoridA, $interactoridB.\n");
                          }
-                    }else{
-                         #you might want to pack this into a sub
-                         print("Converting all IDs in Uniprot KB IDs..\n") unless($no_output);
-                         
-                         $candidate = _compare_uniprotkbids($gene_adaptor, $DF_orthologue_id, $DF_acc_numb_a, $DF_acc_numb_b);
-                         if(!$candidate){
-                             if($err_path){
-                                print $err_data $entry, "\n";
-                                 $entries_err_found = 1;
-                             }
-                             next;
-                         }
-                              
-                         $member = $member_adaptor->fetch_by_source_stable_id("Uniprot/SWISSPROT", $candidate);
-                         if(!$member){
-                              $member = $member_adaptor->fetch_by_source_stable_id("Uniprot/SPTREMBL", $candidate);
-                         }
                     }
                     
+#                    else{
+#                         #you might want to pack this into a sub
+#                         print("Converting all IDs in Uniprot KB IDs..\n") unless($no_output);
+#                         
+#                         $candidate = _compare_uniprotkbids($gene_adaptor, $DF_orthologue_id, $DF_acc_numb_a, $DF_acc_numb_b);
+#                         if(!$candidate){
+#                             if($err_path){
+#                                print $err_data $entry, "\n";
+#                                 $entries_err_found = 1;
+#                             }
+#                             next;
+#                         }
+#                              
+#                         $member = $member_adaptor->fetch_by_source_stable_id("Uniprot/SWISSPROT", $candidate);
+#                         if(!$member){
+#                              $member = $member_adaptor->fetch_by_source_stable_id("Uniprot/SPTREMBL", $candidate);
+#                         }
+#                    }
+                    
                     if(!$member){
-                         print "$DF_interaction_id-($DF_acc_numb_a, $DF_acc_numb_b): fetch_by_source_stable_id returns no member object.\n" unless($no_output);
+                         print "$DF_interaction_id-($DF_acc_numb_a, $DF_acc_numb_b): no member object. Skipping..\n" unless($no_output);
                          if($err_path){
                             print $err_data $entry, "\n";
                             $entries_err_found = 1;
@@ -1655,6 +1773,348 @@ sub get_backward_orthologies{
      return 1;
 }
 
+#
+#_fuzzy_match
+#
+# Usage     : How to use this function/method
+# Purpose   : sometimes, even when an ensembl-compatible output id is found in the intact datafile, it is in a different format that the one
+#             we are dealing with. EG: FBgnxxxx and CGxxx are both recognised by ensembl. If I get a CGxxx I will have duplicates, and ideally
+#             I want not only an output id in a format recognised by ensembl, but also one in the same format as the input one. This function
+#             does a fuzzy match between a "signature" I've extracted from the input id and and the output id. Please adjust the parameters
+#             to best match your needs according to the string::approx module guide on cpan:
+#             http://search.cpan.org/~jhi/String-Approx-3.26/Approx.pm
+# Returns   : return code for error/success
+# Argument  : signature extracted from the input id (eg: ENSMUSG ) and output id
+# Throws    : -
+# Comment   : This is a sample subroutine header.
+#           : -
+#
+#See Also   : 
+
+sub _fuzzy_match {
+     my ($sig, $id_to_test) = @_;
+ 
+     return amatch($sig, [ # this array sets match options:
+                              "i",    # match case-insensitively
+                         ], $id_to_test);
+}
+
+
+
+
+
+=head2 get_direct_interactions
+
+ Usage     : $RC = Bio::Homology::InterologWalk::get_direct_interactions(
+                                                                 registry        => $registry,
+                                                                 source_org      => $sourceorg,
+                                                                 input_path      => $in_path,
+                                                                 output_path     => $out_path,
+                                                                 url             => $url,
+                                                                 check_ids       => 1,   
+                                                                 no_spoke        => 1, 
+                                                                 exp_only        => 1, 
+                                                                 physical_only   => 1, 
+                                                                 no_output       => 0 
+                                                                 );
+ Purpose   : this methods allows  to query the Intact database using the REST interface. 
+             IntAct is the Molecular Interaction database at the European Bioinformatics 
+             Institute (UK). The Intact project offers programmatic access to their data 
+             through the PSICQUIC specification (see 
+             http://code.google.com/p/psicquic/wiki/PsicquicSpecification).
+             This routine is different and more complex than get_interactions() from the 
+             main module. This one is meant to query intact directly with the ids provided 
+             by the user: no intermediate orthologues from ensembl are collected.
+             The bulk of the script is used for the following reason: each query to intact 
+             through psicquic returns a data entry including a binary protein interaction, 
+             and the the two ids returned are uniprotkb or other protein ids. 
+             We need to
+                a- convert both to a format recognised by ensembl
+                b- identify which of the two corresponds to our initial id
+                c- convert the other one to ensembl and store it in the file
+             This conversion is not trivial as the possibility of ambiguities/errors/wrong 
+             matches between ensembl gene representations and uniprot protein representations 
+             is high.
+ Returns   : return code for error/success 
+ Argument  : -registry: registry object to connect to Ensembl
+             -source_org : source organism name (eg: "Mus musculus")
+             -input_path : path to input file. Input file MUST be a text file with one entry 
+              per row, each entry containing an up-to-date
+              gene ID recognised by the Ensembl consortium (http://www.ensembl.org/) followed 
+              by a new line char.
+             -output_path : where you want the routine to write the data. Data is in TSV format.
+             -url : url for the REST service to query (currently only EBI Intact PSICQUIC Rest)
+             -(OPTIONAL) check_ids : if true, every interactor id found in intact data will 
+              be double checked against ensembl.
+              this is useful because intact dbs sometimes contain obsolete versions of some 
+              ids. However chosing true will significantly slow down the processing
+             -(OPTIONAL) no_spoke: if set, interactions obtained from the expansion of 
+               complexes through the SPOKE method 
+              (see http://nar.oxfordjournals.org/cgi/content/full/38/suppl_1/D525)
+              will be ignored
+             -(OPTIONAL) exp_only: if set, only interactions whose MITAB25 field 
+              "Interaction Detection Method" 
+              (MI:0001 in the PSI-MI controlled vocabulary) is at least "experimental 
+              interaction detection" 
+              (MI:0045 in the PSI-MI controlled vocabulary) will be retained. I.e. if set, 
+              this flag only allows 
+              experimentally detected interactions to be retained and stored in the data file
+             -(OPTIONAL) physical_only: if set, only interactions whose MITAB25 field 
+              "Interaction Type" 
+              (MI:0190 in the PSI-MI controlled vocabulary) is at least "physical association" 
+              (MI:0915 in the PSI-MI controlled vocabulary) will be retained. I.e. 
+              if set, this flag only allows 
+              physically associated PPIs to be retained and stored in the data file: 
+              colocalizations and genetic interactions will be discarded
+             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output 
+              during test. Default is 0.
+ Throws    : -
+ Comment   : -
+
+See Also   : L</get_interactions>
+
+=cut
+
+sub get_direct_interactions{
+     my %args = @_;
+     
+     my $registry        = $args{registry};
+     my $sourceorg       = $args{source_org};
+     my $in_path         = $args{input_path};
+     my $out_path        = $args{output_path};
+     my $url             = $args{url};
+     my $check_ids       = $args{check_ids};
+     my $no_spokes       = $args{no_spoke};
+     my $exp_only        = $args{exp_only};
+     my $physical_only   = $args{physical_only};
+     my $no_output       = $args{no_output};
+     
+     my $ID_OUT; #the object of our search
+     
+     if(!$registry){
+          print("get_direct_interactions(): no registry defined. Aborting..\n");
+          return;
+     }
+     if(!$sourceorg){
+          print("get_direct_interactions(): no source organism specified. Aborting..\n");
+          return;
+     }
+     if(!$url){
+          print("get_direct_interactions(): no PSICQUIC url specified. Aborting..\n");
+          return;
+     }
+
+     #MANAGE FILES
+     open (my $in_data,  q{<}, $in_path) or croak("Unable to open $in_path : $!");
+     open (my $out_data,  q{>}, $out_path) or croak("Unable to open $out_path : $!");
+     #============
+     my $client = REST::Client->new();
+     my $gene_adaptor = $registry->get_adaptor($sourceorg, 'core', 'Gene'); 
+     
+     my $atleast_one_entry;
+     
+     my $DF_interaction_id;
+     my $DF_acc_numb_a;  
+     my $DF_acc_numb_b;
+     my $DF_alt_id_a;
+     my $DF_alt_id_b;
+     my $DF_name_a; 
+     my $DF_name_b;
+     my $DF_taxon_a;
+     my $DF_taxon_b;
+     my $DF_props_a;
+     my $DF_props_b;
+     my $DF_pub;
+     my $DF_int_type;    
+     my $DF_det_method;
+     my $DF_exp_method;
+     
+     #interactor search string
+     my $int_search_string = "search/interactor/";
+     #GLOBAL search string
+     my $glob_search_string = "search/query/";
+     #Header
+     print $out_data $HEADER_DIRECT, "\n";
+     
+     my $options = _build_query_options(
+                       no_spoke   => $no_spokes, 
+                       exp_only   => $exp_only,
+                       phys_only  => $physical_only
+                       );
+
+     my $missed = 0;
+     while (<$in_data>){
+          my ($ID) = $_;
+          chomp $ID;
+          next if ($ID eq '');
+          
+          my $idsignature;
+          #get a "signature" to spot the kind of id we are dealing with.
+          #current solution involves getting all the letters starting from the beginning, if there's at least two.
+          #otherwise get the initial three characters whatever they are, and then do a fuzzy regex matching using string::approx
+          #this will be needed in order to be sure to get the same kind of id back.
+          #eg "IPR006259" ----> "IPR"
+          if($ID =~ /^([a-z]{2,})(.+)/i){
+               $idsignature = $1;
+          }else{
+               $idsignature = substr($ID, 0, 1) . substr($ID, 1, 1) . substr($ID, 1, 1);
+          }
+          
+          print "$ID: Querying IntAct WS for $ID.." unless($no_output);
+          my $request = $url . $int_search_string.  $ID . $options;
+          
+          $client->GET($request);
+          print "(", $client->responseCode(), ")" unless($no_output);
+          
+          my $responseContent = $client->responseContent();
+          if(!$responseContent){
+               #Let's try
+               #a global search, to search for the id in non-standard data fields:
+               $request = $url . $glob_search_string.  $ID . $options;
+               $client->GET($request);
+               $responseContent = $client->responseContent();
+               if(!$responseContent){
+                    print("..nothing..\n") unless($no_output);
+                    next;    
+               }
+          }
+          $atleast_one_entry = 1;
+          my @responsetoparse = split(/\n/,$responseContent);
+          my $interactionsRetrieved = scalar @responsetoparse;
+          print "..Interactions found: ", $interactionsRetrieved, "\n" unless($no_output);
+          
+          foreach my $intactInteraction (@responsetoparse){
+               my @MITABDataRow = split("\t",$intactInteraction);
+               
+               #the following relies heavily on Intact's mitab implementation
+               $DF_interaction_id = _get_intact_id($MITABDataRow[13]);
+               next if(!$DF_interaction_id);
+               
+               $DF_taxon_a    = _get_interactor_taxon($MITABDataRow[9]);
+               $DF_taxon_b    = _get_interactor_taxon($MITABDataRow[10]);
+               next if($DF_taxon_a ne $DF_taxon_b);
+               
+               $DF_acc_numb_a = _get_interactor_uniprot_id($MITABDataRow[0]);
+               $DF_acc_numb_b = _get_interactor_uniprot_id($MITABDataRow[1]);
+               $DF_alt_id_a   = _get_interactor_alias_prop_list($MITABDataRow[2]);
+               $DF_alt_id_b   = _get_interactor_alias_prop_list($MITABDataRow[3]);
+               $DF_name_a     = _get_interactor_name($MITABDataRow[4]);
+               $DF_name_b     = _get_interactor_name($MITABDataRow[5]);
+               $DF_props_a    = _get_interactor_alias_prop_list($MITABDataRow[19]);
+               $DF_props_b    = _get_interactor_alias_prop_list($MITABDataRow[20]);
+               $DF_pub        = $MITABDataRow[8];
+               $DF_int_type   = $MITABDataRow[11];
+               $DF_det_method = $MITABDataRow[6];
+               $DF_exp_method = $MITABDataRow[24];
+
+               $ID_OUT = _get_ensembl_id_from_mitab_data(
+                                                    init_id          => $ID,
+                                                    acc_numb_a       => $DF_acc_numb_a,
+                                                    acc_numb_b       => $DF_acc_numb_b,
+                                                    alt_id_a         => $DF_alt_id_a,
+                                                    alt_id_b         => $DF_alt_id_b,
+                                                    name_a           => $DF_name_a,  
+                                                    name_b           => $DF_name_b,
+                                                    props_a          => $DF_props_a,
+                                                    props_b          => $DF_props_b,
+                                                    adaptor          => $gene_adaptor,
+                                                    id_check         => $check_ids                                                   
+                                                    );
+               #fuzzy string matching: this ID_OUT should be of the same kind as the original id. Does it feature the same initial
+               #id signature or something very close?
+               #if(!_fuzzy_match($idsignature, $ID_OUT)){
+               #     $ID_OUT = _get_ensembl_id_from_uniprotkb_id($gene_adaptor, $target_AccNumb, $target_Name, $target_Aliases, $target_PropsRow);
+               #}
+               #TODO REVIEW THIS                                    
+
+               if($ID_OUT){
+                    print("Interaction ($DF_interaction_id): $ID <--> $ID_OUT\n") unless($no_output);
+                    my $fullDataRow = join("\t",$ID,$DF_interaction_id,
+                                        $DF_acc_numb_a, $DF_acc_numb_b,
+                                        $DF_alt_id_a, $DF_alt_id_b,
+                                        $DF_name_a, $DF_name_b,
+                                        $DF_taxon_a, $DF_taxon_b,
+                                        $DF_pub, $DF_int_type,$DF_det_method,
+                                        $DF_exp_method,$ID_OUT);
+                    print $out_data $fullDataRow, "\n";
+                    next;
+               }
+               
+               #If we're here, we weren't able to identify the target interactor id. We'll have to translate both
+               print("Target ID not found through Intact Data. Translating both...\n");
+
+               my $interactoridA = _get_ensembl_id_from_uniprotkb_id(
+                                                            adaptor       => $gene_adaptor, 
+                                                            ebi_id        => $DF_interaction_id,    
+                                                            acc_numb      => $DF_acc_numb_a, 
+                                                            protein_name  => $DF_name_a, 
+                                                            aliases       => $DF_alt_id_a, 
+                                                            props         => $DF_props_a
+                                                            );
+               my $interactoridB = _get_ensembl_id_from_uniprotkb_id(
+                                                            adaptor       => $gene_adaptor, 
+                                                            ebi_id        => $DF_interaction_id,    
+                                                            acc_numb      => $DF_acc_numb_b, 
+                                                            protein_name  => $DF_name_b, 
+                                                            aliases       => $DF_alt_id_b, 
+                                                            props         => $DF_props_b
+                                                            );
+               
+                #RIVEDI QUA!!
+#               print("Converting all IDs in Uniprot KB IDs..\n") unless($no_output);
+#                         
+#               my $candidate = Bio::Homology::InterologWalk::_compare_uniprotkbids($gene_adaptor, $ID, $DF_acc_numb_a, $DF_acc_numb_b);
+#               if($candidate){
+#                    print $candidate;  
+#               }else{
+#                    $missed += 1;
+#                    next     
+#               }
+
+               #Last hope. Let's give up and save the name instead of the id.
+#               if(!$interactoridA){
+#                    $interactoridA = $DF_name_a if($DF_name_a ne '-');
+#               }
+#               if(!$interactoridB){
+#                    $interactoridB = $DF_name_b if($DF_name_b ne '-');
+#               }
+               unless($interactoridA and $interactoridB){
+                    print("At least one of the two identifiers could not be retrieved. Skipping..\n");
+                    $missed += 1;
+                    next;
+               }
+
+               if($interactoridA eq $ID){
+                    $ID_OUT = $interactoridB;
+               }elsif($ID eq $interactoridB){
+                    $ID_OUT = $interactoridA;
+               }else{
+                    print("\nWARNING id mismatch between $ID, $interactoridA, $interactoridB. Skipping..\n"); 
+                    $missed += 1;
+                    next;
+               }
+
+               print("Interaction ($DF_interaction_id): $ID <--> $ID_OUT\n") unless($no_output);
+               my $fullDataRow = join("\t",$ID,$DF_interaction_id,
+                                             $DF_acc_numb_a, $DF_acc_numb_b,
+                                             $DF_alt_id_a, $DF_alt_id_b,
+                                             $DF_name_a, $DF_name_b,
+                                             $DF_taxon_a, $DF_taxon_b,
+                                             $DF_pub, $DF_int_type,$DF_det_method,
+                                             $DF_exp_method,$ID_OUT);
+               print $out_data $fullDataRow, "\n";
+          }
+     }
+     print("Missed: $missed\n") unless($no_output);
+     close $in_data;
+     if(!$atleast_one_entry){
+        unlink($out_path);
+        print("\n**No interactions found. Exiting..**\n");
+        return;
+     }
+     close $out_data;
+     return 1;
+}
 
 
 =head2 do_counts
@@ -1754,10 +2214,15 @@ sub do_counts{
           my $accA        = $row->{$FN_acc_numb_a};
           my $accB        = $row->{$FN_acc_numb_b};
           my $detMethod   = $row->{$FN_det_method};
-          my $taxon       = $row->{$FN_taxon_a};
-          #my $taxonB      = $row->{$FN_taxon_b};
-          #I actually filter them to be equal in get_backward_orthologies so taxona = taxonb for my dataset
+          my $taxonA      = $row->{$FN_taxon_a};
+          my $taxonB      = $row->{$FN_taxon_b};
           
+          my $taxon;
+          if($taxonA eq $taxonB){
+               $taxon = $taxonA;
+          }else{
+               $taxon = join("-", sort($taxonA, $taxonB));
+          }
           ############################
           # Checking for reinforcement
           # of interaction through several det methods
@@ -2000,7 +2465,7 @@ sub _compare_uniprotkbids{
      
      foreach my $link (@$uniprot_links) {
           my $item = $link->primary_id;
-     $uniprotANseen{$item} = 1;
+          $uniprotANseen{$item} = 1;
      }
      
      if(exists $uniprotANseen{$uniprot_id_a}){
@@ -2153,10 +2618,11 @@ sub _get_interactor_uniprot_id{
 
 
 #
-#_get_interactor_aliases
+#_get_interactor_alias_prop_list
 #
 # Usage     : How to use this function/method
-# Purpose   : This is used by get_interactions() to clean up the accession number field retrieved from the db
+# Purpose   : This is used by get_interactions() and get_direct_interactions() 
+#             to clean up the intact alternative id list or the intact properties list
 #                eg uniprotkb:q0pby3_camje(shortlabel) -> uniprotkb:q0pby3_camje
 # Returns   : string in DB:name format
 # Argument  : string in DB:name format(other)
@@ -2165,27 +2631,27 @@ sub _get_interactor_uniprot_id{
 #           : -
 #
 #See Also   : 
-sub _get_interactor_aliases{
-     #I'm fine with this string, save for the recently introduced explanations in brackets. I
-     #want to remove everything in brackets
-     my ($aliasString) = @_;
-     my $cleanAlias;
-     my @cleanAliasVec;
+sub _get_interactor_alias_prop_list{
+     my ($data_string) = @_;
+     my $clean_item;
+     my @clean_item_vec;
      my $result;
      
-     my @aliasvec = split(/\|/, $aliasString);
+     my @data_vec = split(/\|/, $data_string);
      
-     foreach my $alias (@aliasvec){ #db:string
-          if($alias =~ /(\w+):(.+)\((.+)\)/){ #eg.: uniprotkb:q0pby3_camje(shortlabel)
-               $cleanAlias = $1 . ":" . $2;
-               push(@cleanAliasVec, $cleanAlias);
-          }else{#just give up and save the original
-               push(@cleanAliasVec, $alias);
+     foreach my $item (@data_vec){ #db:string
+          if($item =~ /(\w+):(.+)\((.+)\)/){ #eg.: uniprotkb:q0pby3_camje(shortlabel)
+               $clean_item = $1 . ":" . $2;
+               push(@clean_item_vec, $clean_item);
+          }else{
+               push(@clean_item_vec, $item); #leave it unchanged
           }
      }
-     $result = join('|', @cleanAliasVec);
+     $result = join('|', @clean_item_vec);
      return $result;
 }
+
+
 
 #
 #_get_interactor_taxon
@@ -2243,8 +2709,80 @@ sub _get_vector_from_string{
      return @result;
 }
 
+#_is_primary_id
 #
-#_get_ensembl_id
+# Usage     : How to use this function/method
+# Purpose   : ids obtained by Intact CAN be obsolete/secondary. This routine checks an output id found in an intact data entry against ensembl,
+#             to see if it recognises it. If it recognises it, but the id is secondary, the routine will return the primary id.
+# Returns   : undefined or the primary id for the id given as input
+# Argument  : id to check against ensembl, gene adaptor
+# Throws    : -
+# Comment   : This is a sample subroutine header.
+#           : -
+#
+#See Also   : 
+
+sub _is_primary_id {
+     my ($id_to_test, $gene_adaptor) = @_;
+     my $candidateID;
+     
+     my $gene = $gene_adaptor->fetch_by_stable_id($id_to_test);
+     return 1 if(defined $gene);
+     
+     my $genesArray = $gene_adaptor->fetch_all_by_external_name($id_to_test);
+          
+     if(scalar(@$genesArray) == 1){
+          return 1;
+     }elsif(scalar(@$genesArray) == 0){
+          print("_is_primary_id(): $id_to_test found in Intact not recognised by ensembl. Backing up..\n");
+          return;
+     }else{
+          foreach my $gene (@$genesArray){
+               $candidateID = $gene->stable_id;
+               return 1 if($candidateID eq $id_to_test);
+          }
+          return; #multiple gene objects and none matches our id...
+     }
+     return;
+}
+
+
+#
+#_get_ens_id_from_props
+#
+# Usage     : How to use this function/method
+# Purpose   : This is used to get an ensembl id from the properties field of a binary intact interaction.
+#             It's necessary because the binary interaction returned by intact will be in uniprotkb format, while I want to pull out
+#             a gene-level representation of the interactor in ensembl-recognisable format
+# Returns   : either undefined or an ensembl id
+# Argument  : aproperties string
+# Throws    : -
+# Comment   : This is a sample subroutine header.
+#           : -
+#
+#See Also   : 
+
+sub _get_ens_id_from_props{
+     my ($prop_string) = @_;
+     
+     my @prop_vector = split(/\|/, $prop_string);
+     
+     foreach my $item (@prop_vector){
+          if($item =~ /^(ensembl):(.+)/){
+               return $2;
+          #the next is for yeast. Intact stores id information in the properties, for yeast. However it gets it from cyg.
+          #the is the same I'd get from ensembl (maybe more updated?) apart from the letters being lowercase. I turn it to full
+          #uppercase for compatibility
+          }elsif($item =~ /^(cygd):(.+)/){
+               return uc($2);
+          }
+     }
+     return;
+}
+
+
+#
+#_get_ensembl_id_from_mitab_data
 #
 # Usage     : How to use this function/method
 # Purpose   : This is used by get_backward_orthologies() to obtain the Ensembl ID of a gene out of a UniprotKB id of a protein. A loss of 
@@ -2256,115 +2794,319 @@ sub _get_vector_from_string{
 # Comment   : 
 #
 #See Also   : 
-sub _get_ensembl_id{
-     my %args = @_;
-     my $gene_adaptor   = $args{adaptor};
-     my $ebi_id         = $args{ebi_id};
-     my $orthologueid   = $args{ortho_id};
-     my $interactorid   = $args{acc_numb};
-     my $name           = $args{protein_name};
-     my $aliasvector    = $args{aliases};
-     my $no_output      = $args{no_output};
 
-     my $ensemblid;
+#I need ensembl ids for each interactor pair. They must be of the same kind of those present in the initial set
+#However, I only get UniprotKB accession numbers from Intact. There are several ways to obtain
+#ensembl ids from those. 
+#Intact MIGHT provide the fb ids of the interactors in the properties field (19 and 20). However this will not always happen
+#we can also query ensemble with the UNIPROTKB and see if we get back a stable_id. The second way is probably better, however, ensembl
+#won't recognise isoforms (eg queries in the form "Q24312-2") which we have to clean out (Q24312) therefore losing some information.
+#CURRENT SOLUTION:
+#1)look for ids in the "properties" field, if none
+#2)look for ids in the "aliases" field, if none
+#3)query ensembl with the uniprotkb (slower and possibility of redundancy and ambiguities)
+#4)failsafe: print the name instead of the id. TODO EXPERIMENTAL
+
+#the ensembl id is often hidden in the properties or aliases rows. If it's there, I can avoid querying ensembl
+#This function will NOT query ensembl. If this fails, we'll do that
+
+#input: all the fields that might contain an ensembl id of the gene for the protein that's interacting
+#output: an ensembl id of the gene that codes for the protein interacting with the $initial_id or undef
+sub _get_ensembl_id_from_mitab_data{
+     my %args = @_;
+     my $initial_id   = $args{init_id};
+     my $acc_numb_a   = $args{acc_numb_a};
+     my $acc_numb_b   = $args{acc_numb_b};
+     my $alt_id_a     = $args{alt_id_a};
+     my $alt_id_b     = $args{alt_id_b};
+     my $name_a       = $args{name_a};
+     my $name_b       = $args{name_b};
+     my $props_a      = $args{props_a};
+     my $props_b      = $args{props_b};
+     my $g_adaptor    = $args{adaptor};
+     my $id_check     = $args{id_check};
+
+     my $output_id;
+     my $candidate;
+     my $target_PropsRow;
+     my $target_AccNumb;
+     my $target_Aliases;
+     my $target_Name;
      
-     if($interactorid =~ /(\w+)(-\d{1})$/){
-          $interactorid = $1;
+     #autointeraction: no need to analyse anything. Just put the input id in the output id and print it
+     if( ($acc_numb_a eq $acc_numb_b) and
+         ($alt_id_a eq $alt_id_b)     and
+         ($props_a eq $props_b)       and
+         ($name_a eq $name_b)            ){
+              
+          $output_id = $initial_id;
+          return $output_id;
      }
-     
-     #accessionnumber
-     $ensemblid = _query_generic_id($gene_adaptor, $orthologueid, $interactorid);
-     if(!$ensemblid){  #name
-          #I want to know how many I couldn't get immediately by querying simply the id.
-          $ENSEMBLIDFAILED = 1;    
-          print "$ebi_id-($interactorid): query by accession number $interactorid ambiguous/empty, trying name..\n" unless($no_output);
-          $ensemblid = _query_generic_id($gene_adaptor, $orthologueid, $name);
-          if(!$ensemblid){ #aliases
-               print "$ebi_id-($interactorid): query by name $name ambiguous/empty, trying aliases..\n" unless($no_output);
-               my @aliases = _get_vector_from_string($aliasvector);
-               foreach my $alias (@aliases){
-                    $ensemblid = _query_generic_id($gene_adaptor, $orthologueid, $alias);
-                    if($ensemblid){
-                         print "Found by alias: $alias\n" unless($no_output);
-                         return $ensemblid;
-                    }
-               }
-               
-               foreach my $alias (@aliases){
-                    my $stableid = $gene_adaptor->fetch_by_stable_id($alias);
-                    if (defined $stableid){
-                         print("Found by alias: $alias\n") unless($no_output);
-                         $ensemblid = $stableid->stable_id;
-                         return $ensemblid;
-                    }
-               }
-               
-               if(!$ensemblid){
-                    print "$ebi_id-($interactorid): name/aliases did not help, trying external_db string..\n" unless($no_output);
-                    #last chance. I'll choose  'curated'/'automatic' over 'clone based'
-                    my $gArray = $gene_adaptor->fetch_all_by_external_name($interactorid);
-                    foreach my $gene (@$gArray){
-                         my $externaldb = $gene->external_db;
-                         if ($externaldb =~ /curated/){
-                              return ($gene->stable_id);
-                         }elsif ($externaldb =~ /automatic/){
-                              return ($gene->stable_id);
-                         }
-                    }
-                    print("$ebi_id-($interactorid): no way to distinguish multiple genes in array. Switching to UniprotKB ids..\n") unless($no_output);
-                    return;
-               }
+     #first of all let's consider the (rare) case in which the two ids are in the same format as the initial ids:
+     if( ($initial_id eq $acc_numb_a) or ($initial_id  eq $acc_numb_b)  ){
+          $candidate = $acc_numb_b if($initial_id eq $acc_numb_a);
+          $candidate = $acc_numb_a if($initial_id eq $acc_numb_b); 
+          
+          $output_id = _query_generic_identifier($g_adaptor,$candidate);
+          return $output_id if($output_id);
+     }
+     #if at least one of them is recognisable, I know I'll have to analyse only the other:
+     if( ($props_a  =~ /($initial_id)/)  or 
+         ($props_b  =~ /($initial_id)/)  or
+         ($alt_id_a =~ /($initial_id)/)  or
+         ($alt_id_b =~ /($initial_id)/)    ){
+              
+          if( ($props_a  =~ /($initial_id)/) or
+              ($alt_id_a =~ /($initial_id)/)   ){
+               $target_PropsRow  = $props_b;
+               $target_AccNumb   = $acc_numb_b;
+               $target_Aliases   = $alt_id_b;
+               $target_Name      = $name_b;
+          }elsif( ($props_b  =~ /($initial_id)/) or
+              ($alt_id_b =~ /($initial_id)/)   ){
+               $target_PropsRow = $props_a;
+               $target_AccNumb  = $acc_numb_a;
+               $target_Aliases  = $alt_id_a;
+               $target_Name     = $name_a;
+          }
+          #-------properties--------
+          #most intact interaction contain the gene id name in many forms within the properties field.
+          $output_id = _get_ens_id_from_props($target_PropsRow);
+          if($output_id){ 
+               #optional ensembl check on the IDOUT contained in intact
+               if($id_check and (!_is_primary_id($output_id, $g_adaptor)) ){
+                    $output_id = _get_ensembl_id_from_uniprotkb_id(
+                                                       adaptor        =>   $g_adaptor, 
+                                                       ebi_id         =>   '-',#TODO
+                                                       acc_numb       =>   $target_AccNumb, 
+                                                       protein_name   =>   $target_Name, 
+                                                       aliases        =>   $target_Aliases, 
+                                                       props          =>   $target_PropsRow);
+               }                         
+          }else{ #no id in intact? then get it from ensembl through accession number, name, aliases
+               #TODO check the visibility of the following function. It probably needs to be shifted in this
+               #package
+               $output_id = _get_ensembl_id_from_uniprotkb_id(                                                       
+                                                       adaptor        =>   $g_adaptor, 
+                                                       ebi_id         =>   '-',#TODO
+                                                       acc_numb       =>   $target_AccNumb, 
+                                                       protein_name   =>   $target_Name, 
+                                                       aliases        =>   $target_Aliases, 
+                                                       props          =>   $target_PropsRow);
           }
      }
-     #print "Found by name: $name\n";
-     return $ensemblid;
+     return $output_id; #this can be empty
 }
 
-#
-#_query_generic_id
+
+
+#_get_ensembl_id_from_uniprotkb_id
 #
 # Usage     : How to use this function/method
-# Purpose   : This is used by _get_ensembl_id() to query an id, or a name, or an alias, against Ensembl
-# Returns   : the Ensembl ID of the gene or undefined
-# Argument  : a gene adaptor, the ebi id of the interaction, the id of the initial interactor, the id we want to translate
+# Purpose   : this is used when we have to resort to ensembl to recognise an external id: eg, when the intact data line does not contain
+#             clues about the gene related to the uniprokb id they provide. It's based on a "backing up" procedure whereby I try to obtain
+#             the id from progressively less reliable information provided by intact: (the accession number itself,
+#             the protein name, the protein properties, the protein alternative ids)
+# Returns   : either undefined or the ensembl id for the input id
+# Argument  : gene adaptor for the taxon considered, id to query, name, 
+#             interaction id, properties string, aliases string (from intact)
+# Throws    : -
+# Comment   : This is a sample subroutine header.
+#           : -
+#
+#See Also   : 
+
+sub _get_ensembl_id_from_uniprotkb_id{
+     #my ($adaptor, $input_ID, $input_Name, $input_Aliases, $input_Props) = @_;
+     
+     my %args = @_;
+     my $adaptor        = $args{adaptor};
+     my $ebi_id         = $args{ebi_id};
+     #my $orthologueid   = $args{ortho_id};
+     my $input_ID       = $args{acc_numb};
+     my $input_Name     = $args{protein_name};
+     my $input_Aliases  = $args{aliases};
+     my $input_Props    = $args{props};
+     
+     my $outputID;
+     
+     #I'm getting rid of the ISOFORM : improve on this
+     if($input_ID =~ /(\w+)(-\d{1})$/){
+           $input_ID = $1;
+     }
+   
+     #accession number?
+     $outputID = _query_generic_identifier($adaptor, $input_ID);
+     #$ensemblid = _query_generic_id($gene_adaptor, $orthologueid, $interactorid); old interface
+     return $outputID if($outputID);
+     #$ENSEMBLIDFAILED = 1; TODO needed?
+     #name?
+     print "\t$ebi_id: query by accession number $input_ID ambiguous/empty, trying name..\n";
+     $outputID = _query_generic_identifier($adaptor, $input_Name);
+     return $outputID if($outputID);
+     #properties?
+     print "\t\t$input_ID: query by name ambiguous/empty, trying properties field..\n";
+     my @properties = _get_vector_from_string($input_Props);
+     foreach my $property (@properties){
+          $outputID = _query_generic_identifier($adaptor, $property);
+          if($outputID){
+               print "\t\t$outputID - Found by property: $property\n";
+               return $outputID;
+          }
+     }
+     #aliases?
+     print "\t\t\t$input_ID: query by properties ambiguous/empty, trying aliases..\n";
+     my @aliases = _get_vector_from_string($input_Aliases); 
+     foreach my $alias (@aliases){
+          $outputID = _query_generic_identifier($adaptor, $alias);
+          if($outputID){
+               print "\t\t\t$outputID - Found by alias: $alias\n";
+               return $outputID;
+          }
+     }
+
+     return;
+}
+
+
+
+#
+#_get_ensembl_id_from_ensembl
+#
+# Usage     : How to use this function/method
+# Purpose   : This is used by get_backward_orthologies() to obtain the Ensembl ID of a gene out of a UniprotKB id of a protein. A loss of 
+#             information results from the conversion as isoforms are eliminated. It's acompromise and should be improved
+# Returns   : the Ensembl ID of the gene 
+# Argument  : a gene_adaptor from ensembl, the intact interaction id, the id of the orthologue of the original query gene, and
+#             id, name, aliases of the gene whose ensembl id we're looking for
 # Throws    : -
 # Comment   : 
 #
 #See Also   : 
-sub _query_generic_id{
-     my ($gene_adaptor, $orthologueid, $identifier) = @_;
-     my $candidateID;
+#sub _get_ensembl_id_from_ensembl{
+#     my %args = @_;
+#     my $gene_adaptor   = $args{adaptor};
+#     my $ebi_id         = $args{ebi_id};
+#     my $orthologueid   = $args{ortho_id};
+#     my $interactorid   = $args{acc_numb};
+#     my $name           = $args{protein_name};
+#     my $aliasvector    = $args{aliases};
+#     my $no_output      = $args{no_output};
+#
+#     my $ensemblid;
+#     
+#     if($interactorid =~ /(\w+)(-\d{1})$/){
+#          $interactorid = $1;
+#     }
+#     
+#     #accessionnumber
+#     $ensemblid = _query_generic_id($gene_adaptor, $orthologueid, $interactorid);
+#     if(!$ensemblid){  #name
+#          #I want to know how many I couldn't get immediately by querying simply the id.
+#          $ENSEMBLIDFAILED = 1;    
+#          print "$ebi_id-($interactorid): query by accession number $interactorid ambiguous/empty, trying name..\n" unless($no_output);
+#          $ensemblid = _query_generic_id($gene_adaptor, $orthologueid, $name);
+#          if(!$ensemblid){ #aliases
+#               print "$ebi_id-($interactorid): query by name $name ambiguous/empty, trying aliases..\n" unless($no_output);
+#               my @aliases = _get_vector_from_string($aliasvector);
+#               foreach my $alias (@aliases){
+#                    $ensemblid = _query_generic_id($gene_adaptor, $orthologueid, $alias);
+#                    if($ensemblid){
+#                         print "Found by alias: $alias\n" unless($no_output);
+#                         return $ensemblid;
+#                    }
+#               }
+#               
+#               foreach my $alias (@aliases){
+#                    my $stableid = $gene_adaptor->fetch_by_stable_id($alias);
+#                    if (defined $stableid){
+#                         print("Found by alias: $alias\n") unless($no_output);
+#                         $ensemblid = $stableid->stable_id;
+#                         return $ensemblid;
+#                    }
+#               }
+#               
+#               if(!$ensemblid){
+#                    print "$ebi_id-($interactorid): name/aliases did not help, trying external_db string..\n" unless($no_output);
+#                    #last chance. I'll choose  'curated'/'automatic' over 'clone based'
+#                    my $gArray = $gene_adaptor->fetch_all_by_external_name($interactorid);
+#                    foreach my $gene (@$gArray){
+#                         my $externaldb = $gene->external_db;
+#                         if ($externaldb =~ /curated/){
+#                              return ($gene->stable_id);
+#                         }elsif ($externaldb =~ /automatic/){
+#                              return ($gene->stable_id);
+#                         }
+#                    }
+#                    print("$ebi_id-($interactorid): no way to distinguish multiple genes in array. Switching to UniprotKB ids..\n") unless($no_output);
+#                    return;
+#               }
+#          }
+#     }
+#     #print "Found by name: $name\n";
+#     return $ensemblid;
+#}
+
+
+
+#
+#_query_generic_identifier
+#
+# Usage     : How to use this function/method
+# Purpose   : This is used by _get_ensembl_id_from_ensembl() to query an id, or a name, or an alias, against Ensembl
+# Returns   : either undefined or the ensembl id for the input id
+# Argument  : gene adaptor for the taxon considered, the id to query
+# Throws    : -
+# Comment   : This is a sample subroutine header.
+#           : -
+#
+#See Also   : 
+sub _query_generic_identifier{
+     my ($adaptor, $ID) = @_;
+     #my ($gene_adaptor, $orthologueid, $identifier) = @_; old interface
+     my $result;
+     my $genesArray = (); my $gene;
      
-     return if($identifier eq '-');
+     return if(!$ID);
+     return if($ID eq '-');
      
-     my $genesArray = $gene_adaptor->fetch_all_by_external_name($identifier);
-          
-     if(scalar(@$genesArray) == 1){
-          $candidateID = @$genesArray[0]->stable_id;
-          return  ($candidateID) if (defined $candidateID);
+     $gene = $adaptor->fetch_by_stable_id($ID);
+     return $gene->stable_id if(defined $gene);
+     
+     $gene = $adaptor->fetch_by_display_label($ID);
+     return $gene->stable_id if(defined $gene);
+     
+     $genesArray = $adaptor->fetch_all_by_external_name($ID);
+     
+     if(scalar(@$genesArray) == 1){ 
+          $gene = @$genesArray[0];
+          return $gene->stable_id if(defined $gene);
      }elsif(scalar(@$genesArray) == 0){
           return;
-     }else{ #several gene objects are retrieved.
-          foreach my $gene (@$genesArray){
-               $candidateID = $gene->stable_id;
-               if ($candidateID eq $orthologueid){
+     }else{ #more than one gene object in genesArray
+          foreach my $gn (@$genesArray){
+                   #if ($candidateID eq $orthologueid){
                    #check if one of the two is the initial interactor:
                    #if that is the case, we pick it and we throw away all the alternatives: what we need is the other one in the pair 
                    #anyway
-                    return $candidateID;
+                   #return $candidateID;
+               if (defined $gn){ #TODO I return the first defined one, improve this
+                    $result = $gn->stable_id;
+                    return $result;
                }
-               #if we're here, there's ambiguity. Skip
           }
-          return;
      }
      return;
 }
+
+
+
 
 #
 #_process_homologies
 #
 # Usage     : How to use this function/method
-# Purpose   : this is called by both get_forward_orthologies and by get_backward_orthologies and it is used to process the homology object
+# Purpose   : this is called by both get_forward_orthologies and  get_backward_orthologies and it is used to process the homology object
 #             returned by ensembl, once for each gene id. This means in here the data fields are build and returned if necessary
 # Returns   : a counter holding the number of orthologues found for the given id
 # Argument  : the source id, the vector of homology members, a protein adaptor, the output file handle and (OPTIONAL) the data vector with the previous mined data
@@ -2424,7 +3166,7 @@ sub _process_homologies{
                my $canonical_pep_member = $homology_member->get_canonical_peptide_Member;
                if($canonical_pep_member){
                     my $mid = $canonical_pep_member->member_id;
-                    if($pt_adaptor){ 
+                    if($pt_adaptor){
                     #TODO TEMP ADDED BECAUSE OF ERROR REPORTED ON 24/OCT TO ENSEMBL ML
                          if($DF_orthologue_id eq $init_id){ #node_x will contain the one I started with
                               $node_x = $pt_adaptor->fetch_AlignedMember_by_member_id_root_id($mid,1);
@@ -3258,6 +4000,7 @@ sub compute_conservation_score{
 		  
 		  if( ($newEdges == 0) || ($newNodes >= $MAX_NODES)){
                $Cscore = _c_score($total_edge_number,$total_node_number);
+               print $Cscore if($Cscore == 0); #TODO DIAGNOSTICS remove
                $gamma = $Cscore / $total_edge_number;
                $scoreEntry = join("\t", $total_node_number, $total_edge_number, $gamma, $Cscore);
                $pairseen{$interactorpair} = $scoreEntry;
@@ -3397,7 +4140,7 @@ sub compute_multiple_taxa_mean{
           "7955", #Drer
      );
      my $NCBI_taxon_adaptor = $registry->get_adaptor("Multi", "compara", "NCBITaxon");
-          
+     
      my $total_taxa = scalar(@taxa);
      if($dataset_number  > $total_taxa){
          print("compute_MTAXA_mean(): ds_number is higher than the number of available taxa ($total_taxa). Aborting..");
@@ -4248,7 +4991,25 @@ sub do_attributes{
           if($label_type =~ /desc/){
                $label = $gene->description;
           }elsif($label_type =~ /ext/){
-               $label = $gene->external_name || $gene->display_id;
+               #$label = $gene->external_name || $gene->display_id;
+               #TODO TEMP ############### FLY ONLY
+               #
+               #
+               my @dblinks = @{ $gene->get_all_DBLinks("FlyBaseName_Gene%") };
+               if(scalar(@dblinks) == 1){
+                    my $flybasenamelink = $dblinks[0];
+                    $label = $flybasenamelink->display_id;
+               }elsif(scalar(@dblinks) == 0){
+                    print "do_attributes(): Error no dblink found\n";
+                    $label = $gene->external_name; 
+               }else{
+                    print "do_attributes():More than one dblink found\n";
+                    $label = $gene->external_name; 
+               }
+               #
+               # TODO TEMP
+               #
+               #
           }else{
                print("do_attributes(): label type unrecognised: $label_type. Aborting..\n");
                return;
@@ -4264,569 +5025,8 @@ sub do_attributes{
 }
 
 
-##############################################
-##############################################
-package Bio::Homology::InterologWalk::Direct;
-##############################################
-##############################################
-use String::Approx 'amatch';
-use Carp qw(croak);
-
-#
-#_clean_string
-#
-# Usage     : How to use this function/method
-# Purpose   : this is used to simply clean up the intact alternative id list or the intact properties list
-# Returns   : a string of alternative ids or properties lacking the explanations in brackets
-# Argument  : a string with the list of alternative ids or properties
-# Throws    : -
-# Comment   : This is a sample subroutine header.
-#           : -
-#
-#See Also   : 
-
-sub _clean_string{
-     #I'm fine with this string, save for the recently introduced explanations in brackets. I
-     #want to remove everything in brackets
-     my ($data_string) = @_;
-     my $clean_item;
-     my @clean_item_vec;
-     my $result;
-     
-     my @data_vec = split(/\|/, $data_string);
-     
-     foreach my $item (@data_vec){ #db:string
-          if($item =~ /(\w+):(.+)\((.+)\)/){
-               $clean_item = $1 . ":" . $2;
-               push(@clean_item_vec, $clean_item);
-          }else{
-               push(@clean_item_vec, $item); #leave it unchanged
-          }
-     }
-     $result = join('|', @clean_item_vec);
-     return $result;
-}
-
-#
-#_get_ens_id
-#
-# Usage     : How to use this function/method
-# Purpose   : This is used to get an ensembl id from the properties field of a binary intact interaction.
-#             It's necessary because the binary interaction returned by intact will be in uniprotkb format, while I want to pull out
-#             a gene-level representation of the interactor in ensembl-recognisable format
-# Returns   : either undefined or an ensembl id
-# Argument  : aproperties string
-# Throws    : -
-# Comment   : This is a sample subroutine header.
-#           : -
-#
-#See Also   : 
-
-sub _get_ens_id{
-     my ($prop_string) = @_;
-     
-     my @prop_vector = split(/\|/, $prop_string);
-     
-     foreach my $item (@prop_vector){
-          if($item =~ /^(ensembl):(.+)/){
-               return $2;
-          }
-     }
-     return;
-}
-
-#
-#_query_generic_identifier
-#
-# Usage     : How to use this function/method
-# Purpose   : used to query some form of id towards ensembl and see if it recognises it
-# Returns   : either undefined or the ensembl id for the input id
-# Argument  : gene adaptor for the taxon considered, the id to query
-# Throws    : -
-# Comment   : This is a sample subroutine header.
-#           : -
-#
-#See Also   : 
-sub _query_generic_identifier{
-     my ($adaptor, $ID) = @_;
-     my $result;
-     my $genesArray = ();
-     my $gene;
-     
-     if($ID eq '-'){
-          #print "_query_generic_identifier(): empty identifier, backing up..\n";
-          return;
-     }
-     
-     $gene = $adaptor->fetch_by_stable_id($ID);
-     return $gene->stable_id if(defined $gene);
-     
-     $gene = $adaptor->fetch_by_display_label($ID);
-     return $gene->stable_id if(defined $gene);
-     
-     $genesArray = $adaptor->fetch_all_by_external_name($ID);
-     
-     if(scalar(@$genesArray) == 1){ 
-          $gene = @$genesArray[0];
-          return $gene->stable_id if(defined $gene);
-     }elsif(scalar(@$genesArray) == 0){
-          return;
-     }else{ #more than one gene object in genesArray
-          foreach my $gn (@$genesArray){
-               if (defined $gn){ #TODO I return the first defined one, improve this
-                    $result = $gn->stable_id;
-                    return $result;
-               }
-          }
-     }
-     return;
-}
 
 
-#_get_ensid_from_uniprotkb
-#
-# Usage     : How to use this function/method
-# Purpose   : this is used when we have to resort to ensembl to recognise an external id: eg, when the intact data line does not contain
-#             clues about the gene related to the uniprokb id they provide. It's based on a "backing up" procedure whereby I try to obtain
-#             the id from progressively less reliable information provided by intact: (the accession number itself,
-#             the protein name, the protein properties, the protein alternative ids)
-# Returns   : either undefined or the ensembl id for the input id
-# Argument  : gene adaptor for the taxon considered, id to query, name, properties string, aliases string (from intact)
-# Throws    : -
-# Comment   : This is a sample subroutine header.
-#           : -
-#
-#See Also   : 
-
-sub _get_ensid_from_uniprotkb{
-     my ($adaptor, $input_ID, $input_Name, $input_Aliases, $input_Props) = @_;
-     my $outputID;
-     
-     #I'm getting read of the ISOFORM : improve on this
-     if($input_ID =~ /(\w+)(-\d{1})$/){
-           $input_ID = $1;
-     }
-          
-     #accession number?
-     $outputID = _query_generic_identifier($adaptor, $input_ID);
-     return $outputID if($outputID);
-     #name?
-     print "\t$input_ID: query by accession number ambiguous/empty, trying name..\n";
-     $outputID = _query_generic_identifier($adaptor, $input_Name);
-     return $outputID if($outputID);
-     #properties?
-     print "\t\t$input_ID: query by name ambiguous/empty, trying properties field..\n";
-     my @properties = Bio::Homology::InterologWalk::_get_vector_from_string($input_Props);
-     foreach my $property (@properties){
-          $outputID = _query_generic_identifier($adaptor, $property);
-          if($outputID){
-               print "\t\t$outputID - Found by property: $property\n";
-               return $outputID;
-          }
-     }
-     #aliases?
-     print "\t\t\t$input_ID: query by properties ambiguous/empty, trying aliases..\n";
-     my @aliases = Bio::Homology::InterologWalk::_get_vector_from_string($input_Aliases); 
-     foreach my $alias (@aliases){
-          $outputID = _query_generic_identifier($adaptor, $alias);
-          if($outputID){
-               print "\t\t\t$outputID - Found by alias: $alias\n";
-               return $outputID;
-          }
-     }
-
-     return;
-}
-
-
-#
-#_fuzzy_match
-#
-# Usage     : How to use this function/method
-# Purpose   : sometimes, even when an ensembl-compatible output id is found in the intact datafile, it is in a different format that the one
-#             we are dealing with. EG: FBgnxxxx and CGxxx are both recognised by ensembl. If I get a CGxxx I will have duplicates, and ideally
-#             I want not only an output id in a format recognised by ensembl, but also one in the same format as the input one. This function
-#             does a fuzzy match between a "signature" I've extracted from the input id and and the output id. Please adjust the parameters
-#             to best match your needs according to the string::approx module guide on cpan:
-#             http://search.cpan.org/~jhi/String-Approx-3.26/Approx.pm
-# Returns   : return code for error/success
-# Argument  : signature extracted from the input id (eg: ENSMUSG ) and output id
-# Throws    : -
-# Comment   : This is a sample subroutine header.
-#           : -
-#
-#See Also   : 
-
-sub _fuzzy_match {
-     my ($sig, $id_to_test) = @_;
- 
-     return amatch($sig, [ # this array sets match options:
-                              "i",    # match case-insensitively
-                         ], $id_to_test);
-}
-
-
-#_is_primary_id
-#
-# Usage     : How to use this function/method
-# Purpose   : ids obtained by Intact CAN be obsolete/secondary. This routine checks an output id found in an intact data entry against ensembl,
-#             to see if it recognises it. If it recognises it, but the id is secondary, the routine will return the primary id.
-# Returns   : undefined or the primary id for the id given as input
-# Argument  : id to check against ensembl, gene adaptor
-# Throws    : -
-# Comment   : This is a sample subroutine header.
-#           : -
-#
-#See Also   : 
-
-sub _is_primary_id {
-     my ($id_to_test, $gene_adaptor) = @_;
-     my $candidateID;
-     
-     my $gene = $gene_adaptor->fetch_by_stable_id($id_to_test);
-     return 1 if(defined $gene);
-     
-     my $genesArray = $gene_adaptor->fetch_all_by_external_name($id_to_test);
-          
-     if(scalar(@$genesArray) == 1){
-          return 1;
-     }elsif(scalar(@$genesArray) == 0){
-          print("_is_primary_id(): $id_to_test found in Intact not recognised by ensembl. Backing up..\n");
-          return;
-     }else{
-          foreach my $gene (@$genesArray){
-               $candidateID = $gene->stable_id;
-               return 1 if($candidateID eq $id_to_test);
-          }
-          return; #multiple gene objects and none matches our id...
-     }
-     return;
-}
-
-
-=head2 get_direct_interactions
-
- Usage     : $RC = Bio::Homology::InterologWalk::Direct::get_direct_interactions(
-                                                                 registry        => $registry,
-                                                                 source_org      => $sourceorg,
-                                                                 input_path      => $in_path,
-                                                                 output_path     => $out_path,
-                                                                 url             => $url,
-                                                                 check_ids       => 1,   
-                                                                 no_spoke        => 1, 
-                                                                 exp_only        => 1, 
-                                                                 physical_only   => 1, 
-                                                                 no_output       => 0 
-                                                                 );
- Purpose   : this methods allows  to query the Intact database using the REST interface. 
-             IntAct is the Molecular Interaction database at the European Bioinformatics 
-             Institute (UK). The Intact project offers programmatic access to their data 
-             through the PSICQUIC specification (see 
-             http://code.google.com/p/psicquic/wiki/PsicquicSpecification).
-             This routine is different and more complex than get_interactions() from the 
-             main module. This one is meant to query intact directly with the ids provided 
-             by the user: no intermediate orthologues from ensembl are collected.
-             The bulk of the script is used for the following reason: each query to intact 
-             through psicquic returns a data entry including a binary protein interaction, 
-             and the the two ids returned are uniprotkb or other protein ids. 
-             We need to
-                a- convert both to a format recognised by ensembl
-                b- identify which of the two corresponds to our initial id
-                c- convert the other one to ensembl and store it in the file
-             This conversion is not trivial as the possibility of ambiguities/errors/wrong 
-             matches between ensembl gene representations and uniprot protein representations 
-             is high.
- Returns   : return code for error/success 
- Argument  : -registry: registry object to connect to Ensembl
-             -source_org : source organism name (eg: "Mus musculus")
-             -input_path : path to input file. Input file MUST be a text file with one entry 
-              per row, each entry containing an up-to-date
-              gene ID recognised by the Ensembl consortium (http://www.ensembl.org/) followed 
-              by a new line char.
-             -output_path : where you want the routine to write the data. Data is in TSV format.
-             -url : url for the REST service to query (currently only EBI Intact PSICQUIC Rest)
-             -(OPTIONAL) check_ids : if true, every interactor id found in intact data will 
-              be double checked against ensembl.
-              this is useful because intact dbs sometimes contain obsolete versions of some 
-              ids. However chosing true will significantly slow down the processing
-             -(OPTIONAL) no_spoke: if set, interactions obtained from the expansion of 
-               complexes through the SPOKE method 
-              (see http://nar.oxfordjournals.org/cgi/content/full/38/suppl_1/D525)
-              will be ignored
-             -(OPTIONAL) exp_only: if set, only interactions whose MITAB25 field 
-              "Interaction Detection Method" 
-              (MI:0001 in the PSI-MI controlled vocabulary) is at least "experimental 
-              interaction detection" 
-              (MI:0045 in the PSI-MI controlled vocabulary) will be retained. I.e. if set, 
-              this flag only allows 
-              experimentally detected interactions to be retained and stored in the data file
-             -(OPTIONAL) physical_only: if set, only interactions whose MITAB25 field 
-              "Interaction Type" 
-              (MI:0190 in the PSI-MI controlled vocabulary) is at least "physical association" 
-              (MI:0915 in the PSI-MI controlled vocabulary) will be retained. I.e. 
-              if set, this flag only allows 
-              physically associated PPIs to be retained and stored in the data file: 
-              colocalizations and genetic interactions will be discarded
-             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output 
-              during test. Default is 0.
- Throws    : -
- Comment   : -
-
-See Also   : L</get_interactions>
-
-=cut
-
-sub get_direct_interactions{
-     my %args = @_;
-     
-     my $registry        = $args{registry};
-     my $sourceorg       = $args{source_org};
-     my $in_path         = $args{input_path};
-     my $out_path        = $args{output_path};
-     my $url             = $args{url};
-     my $check_ids       = $args{check_ids};
-     my $no_spokes       = $args{no_spoke};
-     my $exp_only        = $args{exp_only};
-     my $physical_only   = $args{physical_only};
-     my $no_output       = $args{no_output};
-     
-     if(!$registry){
-          print("get_direct_interactions(): no registry defined. Aborting..\n");
-          return;
-     }
-     if(!$sourceorg){
-          print("get_direct_interactions(): no source organism specified. Aborting..\n");
-          return;
-     }
-     if(!$url){
-          print("get_direct_interactions(): no PSICQUIC url specified. Aborting..\n");
-          return;
-     }
-
-     #MANAGE FILES
-     open (my $in_data,  q{<}, $in_path) or croak("Unable to open $in_path : $!");
-     open (my $out_data,  q{>}, $out_path) or croak("Unable to open $out_path : $!");
-     #============
-     
-     my $client = REST::Client->new();
-     my $gene_adaptor = $registry->get_adaptor($sourceorg, 'core', 'Gene'); 
-     
-     my $atleast_one_entry;
-     
-     my $DF_interaction_id;
-     my $DF_acc_numb_a;  
-     my $DF_acc_numb_b;
-     my $DF_alt_id_a;
-     my $DF_alt_id_b;
-     my $DF_name_a; 
-     my $DF_name_b;
-     my $DF_taxon_a;
-     my $DF_taxon_b;
-     my $DF_props_a;
-     my $DF_props_b;
-     my $DF_pub;
-     my $DF_int_type;    
-     my $DF_det_method;
-     my $DF_exp_method;
-     
-     #PISCQUIC GLOBAL search string
-     my $glob_search_string = "search/query/";
-     #Header
-     print $out_data $HEADER_DIRECT, "\n";
-     
-     my $options = Bio::Homology::InterologWalk::_build_query_options(
-                       no_spoke   => $no_spokes, 
-                       exp_only   => $exp_only,
-                       phys_only  => $physical_only
-                       );
-
-     my $missed = 0;
-     while (<$in_data>){
-          my ($ID) = $_;
-          chomp $ID;
-          next if ($ID eq '');
-          
-          my $idsignature;
-          #get a "signature" to spot the kind of id we are dealing with.
-          #current solution involves getting all the letters starting from the beginning, if there's at least two.
-          #otherwise get the initial three characters whatever they are, and then do a fuzzy regex matching using string::approx
-          #this will be needed in order to be sure to get the same kind of id back.
-          #eg "IPR006259" ----> "IPR"
-          if($ID =~ /^([a-z]{2,})(.+)/i){
-               $idsignature = $1;
-          }else{
-               $idsignature = substr($ID, 0, 1) . substr($ID, 1, 1) . substr($ID, 1, 1);
-          }
-          
-          print "$ID: Querying IntAct web service for binary interactions.." unless($no_output);
-          my $request = $url . $glob_search_string .  $ID . $options ;
-          $client->GET($request);
-          print "(", $client->responseCode(), ")" unless($no_output);
-          my $responseContent = $client->responseContent();
-          if(!$responseContent){
-               print("..nothing..\n") unless($no_output);
-               next;
-          }
-          $atleast_one_entry = 1;
-          my @responsetoparse = split(/\n/,$responseContent);
-          my $interactionsRetrieved = scalar @responsetoparse;
-          print "..Interactions found: ", $interactionsRetrieved, "\n" unless($no_output);
-          
-          foreach my $intactInteraction (@responsetoparse){
-               my @MITABDataRow = split("\t",$intactInteraction);
-               
-               #qui devi sfruttare le regole del MITAB
-               $DF_interaction_id = Bio::Homology::InterologWalk::_get_intact_id($MITABDataRow[13]);
-               next if(!$DF_interaction_id);
-               
-               $DF_acc_numb_a = Bio::Homology::InterologWalk::_get_interactor_uniprot_id($MITABDataRow[0]);
-               $DF_acc_numb_b = Bio::Homology::InterologWalk::_get_interactor_uniprot_id($MITABDataRow[1]);
-               $DF_alt_id_a   = _clean_string($MITABDataRow[2]);
-               $DF_alt_id_b   = _clean_string($MITABDataRow[3]);
-               $DF_name_a     = Bio::Homology::InterologWalk::_get_interactor_name($MITABDataRow[4]);
-               $DF_name_b     = Bio::Homology::InterologWalk::_get_interactor_name($MITABDataRow[5]);
-               $DF_taxon_a    = Bio::Homology::InterologWalk::_get_interactor_taxon($MITABDataRow[9]);
-               $DF_taxon_b    = Bio::Homology::InterologWalk::_get_interactor_taxon($MITABDataRow[10]);
-               
-               next if($DF_taxon_a ne $DF_taxon_b);
-               
-               $DF_pub        = $MITABDataRow[8];
-               $DF_int_type   = $MITABDataRow[11];
-               $DF_det_method = $MITABDataRow[6];
-               $DF_exp_method = $MITABDataRow[24];
-               $DF_props_a    = _clean_string($MITABDataRow[19]);
-               $DF_props_b    = _clean_string($MITABDataRow[20]);
-               
-               my $candidate;
-               my $ID_OUT; #the object of our search
-               
-               #first of all let's consider the (rare) case in which the two ids are in the same format as the initial ids:
-               if( ($ID eq $DF_acc_numb_a) or ($ID  eq $DF_acc_numb_b)  ){
-                    $candidate = $DF_acc_numb_b if($ID eq $DF_acc_numb_a);
-                    $candidate = $DF_acc_numb_a if($ID eq $DF_acc_numb_b); 
-                    
-                    $ID_OUT = _query_generic_identifier($gene_adaptor,$candidate);
-                    if($ID_OUT){
-                         print("Interaction ($DF_interaction_id): $ID <--> $ID_OUT\n") unless($no_output);
-               
-                         my $fullDataRow = join("\t",$ID,$DF_interaction_id,
-                                             $DF_acc_numb_a, $DF_acc_numb_b,
-                                             $DF_alt_id_a, $DF_alt_id_b,
-                                             $DF_name_a, $DF_name_b,
-                                             $DF_taxon_a, $DF_taxon_b,
-                                             $DF_pub, $DF_int_type,$DF_det_method,
-                                             $DF_exp_method,$ID_OUT);
-                         print $out_data $fullDataRow, "\n";
-                         next;
-                    }
-               }
-
-               #I need ensembl ids for each interactor pair. They must be of the same kind of those present in the initial set
-               #However, I only get UniprotKB accession numbers from Intact. There are several ways to obtain
-               #ensembl ids from those. 
-               #We could use the CG alternative id for each UNIPROTKB stored in "alt_id_A/alt_id_B" and then obtain the fbid through ensembl.
-               #Intact MIGHT provide the fb ids of the interactors in the properties field (19 and 20). However this will not always happen
-               #we can also query ensemble with the UNIPROTKB and see if we get back a fbid stable_id. The second way is probably better, however, ensembl
-               #won't recognise isoforms (eg queries in the form "Q24312-2") which we have to clean out (Q24312) therefore losing some information.
-               #CURRENT SOLUTION:
-               #1)look for ids in the "properties" field, if none
-               #2)look for ids in the "aliases" field, if none
-               #3)query ensembl with the uniprotkb (slower and possibility of redundancy and ambiguities)
-               
-               #1
-               my $target_PropsRow;my $target_AccNumb;my $target_Aliases;my $target_Name;
-               #TODO autointeractions
-               
-               #if at least one of them is recognisable, I know I'll have to analyse the other
-               if( ($DF_props_a =~ /($ID)/) or ($DF_props_b =~ /($ID)/)  ){
-                    if( $DF_props_a =~ /($ID)/){
-                         $target_PropsRow = $DF_props_b;
-                         $target_AccNumb = $DF_acc_numb_b;
-                         $target_Aliases = $DF_alt_id_b;
-                         $target_Name = $DF_name_b;
-                    }
-                    if( $DF_props_b =~ /($ID)/){
-                         $target_PropsRow = $DF_props_a;
-                         $target_AccNumb = $DF_acc_numb_a;
-                         $target_Aliases = $DF_alt_id_a;
-                         $target_Name = $DF_name_a;
-                    }
-                    
-                    $ID_OUT = _get_ens_id($target_PropsRow);
-                    
-                    #fuzzy string matching: this ID_OUT should be of the same kind as the original id. Does it feature the same initial
-                    #id signature or something very close?
-                    if(!$ID_OUT){
-                         $ID_OUT = _get_ensid_from_uniprotkb($gene_adaptor, $target_AccNumb, $target_Name, $target_Aliases, $target_PropsRow);
-                    }
-                    
-                    if($check_ids and (!_is_primary_id($ID_OUT, $gene_adaptor)) ){
-                         $ID_OUT = _get_ensid_from_uniprotkb($gene_adaptor, $target_AccNumb, $target_Name, $target_Aliases, $target_PropsRow);
-                    }
-                         
-                    if(!_fuzzy_match($idsignature, $ID_OUT)){
-                         $ID_OUT = _get_ensid_from_uniprotkb($gene_adaptor, $target_AccNumb, $target_Name, $target_Aliases, $target_PropsRow);
-                    }
-                    
-
-                    if($ID_OUT){
-                         print("Interaction ($DF_interaction_id): $ID <--> $ID_OUT\n") unless($no_output);
-               
-                         my $fullDataRow = join("\t",$ID,$DF_interaction_id,
-                                             $DF_acc_numb_a, $DF_acc_numb_b,
-                                             $DF_alt_id_a, $DF_alt_id_b,
-                                             $DF_name_a, $DF_name_b,
-                                             $DF_taxon_a, $DF_taxon_b,
-                                             $DF_pub, $DF_int_type,$DF_det_method,
-                                             $DF_exp_method,$ID_OUT);
-                         print $out_data $fullDataRow, "\n";
-                         next;
-                    }
-               }
-               
-               #If none of the two was recognisable, I'll have to process them both
-               print("Nothing found in Intact Data...Backing up \n");
-
-               my $interactoridA = _get_ensid_from_uniprotkb($gene_adaptor, $DF_acc_numb_a, $DF_name_a, $DF_alt_id_a, $DF_props_a);
-               my $interactoridB = _get_ensid_from_uniprotkb($gene_adaptor, $DF_acc_numb_b, $DF_name_b, $DF_alt_id_b, $DF_props_b);
-               
-               unless($interactoridA and $interactoridB){
-                    print("One of the two identifier could not be retrieved. Skipping..\n");
-                    $missed += 1;
-                    next;
-               }
-
-               if($interactoridA eq $ID){
-                    $ID_OUT = $interactoridB;
-               }elsif($ID eq $interactoridB){
-                    $ID_OUT = $interactoridA;
-               }else{
-                    print("\nWARNING id mismatch between $ID, $interactoridA, $interactoridB. Skipping..\n");
-                    $missed += 1;
-                    next;
-               }
-
-               print("Interaction ($DF_interaction_id): $ID <--> $ID_OUT\n") unless($no_output);
-               my $fullDataRow = join("\t",$ID,$DF_interaction_id,
-                                             $DF_acc_numb_a, $DF_acc_numb_b,
-                                             $DF_alt_id_a, $DF_alt_id_b,
-                                             $DF_name_a, $DF_name_b,
-                                             $DF_taxon_a, $DF_taxon_b,
-                                             $DF_pub, $DF_int_type,$DF_det_method,
-                                             $DF_exp_method,$ID_OUT);
-               print $out_data $fullDataRow, "\n";
-          }
-     }
-     print("Missed: $missed\n") unless($no_output);
-     close $in_data;
-     if(!$atleast_one_entry){
-        unlink($out_path);
-        print("\n**No interactions found. Exiting..**\n");
-        return;
-     }
-     close $out_data;
-     return 1;
-}
 
 
 ##################secondary pod documentation begins##############
@@ -4834,7 +5034,7 @@ sub get_direct_interactions{
 
 =head1 BUGS AND LIMITATIONS
 
-This is B<ALPHA> software. There will be bugs. The interface may change. Please be careful. Do not rely on it for anything mission-critical.
+This is B<BETA> software. There will be bugs. The interface may change. Please be careful. Do not rely on it for anything mission-critical.
 
 
 Please report any bugs you find, bug reports and any other feedback are most welcome. 
@@ -4887,5 +5087,3 @@ Dave Messina, BioPerl list
 #################### secondary pod documentation end ###################
 
 1;
-# The preceding line will help the module return a true value
-

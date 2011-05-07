@@ -67,18 +67,18 @@ my $url = "http://www.ebi.ac.uk/Tools/webservices/psicquic/intact/webservices/cu
 #get interactions                                                          
 my $start_run = time();
 print "\n\n", colored ("Getting Interactions from Intact...", 'green'), "\n\n";
-my $RC1 = Bio::Homology::InterologWalk::Direct::get_direct_interactions(
-                                                    registry            => $registry,
-                                                    source_org          => $sourceorg,
-                                                    input_path          => $in_path,
-                                                    output_path         => $out_path,
-                                                    url                 => $url,
-                                                    check_ids           => 1,     
-                                                    #the following are used to build a more complex query and filter out low quality interactions
-                                                    #no_spoke            => 1, #
-                                                    exp_only            => 1, #
-                                                    physical_only       => 1, #
-                                                    );                                                          
+my $RC1 = Bio::Homology::InterologWalk::get_direct_interactions(
+                                              registry            => $registry,
+                                              source_org          => $sourceorg,
+                                              input_path          => $in_path,
+                                              output_path         => $out_path,
+                                              url                 => $url,
+                                              check_ids           => 1,     
+                                              #the following are used to build a more complex query and filter out low quality interactions
+                                              #no_spoke            => 1, #
+                                              exp_only            => 1, #
+                                              physical_only       => 1, #
+                                              );                                                          
 if(!$RC1){
      print "There were errors. Stopping..\n";
      exit;

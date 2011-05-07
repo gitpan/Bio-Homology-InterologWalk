@@ -69,14 +69,14 @@ my $registry = Bio::Homology::InterologWalk::setup_ensembl_adaptor(
                                                    
 my $in_path = $test_data_dir . "mmus.txt";
 my $out_path = $test_data_dir . "mmus.test1";
-my $rc_1 = Bio::Homology::InterologWalk::Direct::get_direct_interactions(
-                                                         registry         => $registry,
-                                                         source_org       => $sourceorg,
-                                                         input_path       => $in_path,
-                                                         output_path      => $out_path,
-                                                         url              => $url,
-                                                         no_output        => 1,
-                                                         );
+my $rc_1 = Bio::Homology::InterologWalk::get_direct_interactions(
+                                                   registry         => $registry,
+                                                   source_org       => $sourceorg,
+                                                   input_path       => $in_path,
+                                                   output_path      => $out_path,
+                                                   url              => $url,
+                                                   no_output        => 1,
+                                                   );
 ok( defined $rc_1,            "get_direct_interactions() return value appears to be correct" );
 
 

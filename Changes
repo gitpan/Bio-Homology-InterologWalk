@@ -1,5 +1,22 @@
 Revision history for Perl extension Bio::Homology::InterologWalk.
 
+0.501   Sat May 7 14:02:02 2011
+	- compute_confidence_score(): boolean variables restored
+        - corrected version bug
+
+0.5   Fri May 6 12:46:25 2011
+	- First Beta Release
+        - _get_ens_id(): added cygid option to deal with embedded yeast ids
+        - merged get_ensembl_id_from_ensembl() and get_ensembl_id_from_uniprot()
+        - merged all duplicates between the pacakges: Bio::Homology::InterologWalk and
+          Bio::Homology::InterologWalk::Direct
+        - get_direct_interactions(): rewritten and moved to Bio::Homology::InterologWalk
+        - removed Bio:Homology::InterologWalk::Direct package. All unmerged subroutines moved to
+          Bio::Homology::InterologWalk
+        - get_interactions(): rewritted to gather 'properties' field from MITAB data
+        - get_backward_orthologies(): rewritten to use 'properties' field from MITAB data 
+        - _clean_ids(): removed
+
 0.12  Wed Jan 12 12:07:01 2011
         - Modified Makefile.PL  to avoid failing tests when prerequisite
           software on testers' machines is missing
