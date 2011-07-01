@@ -1,5 +1,9 @@
 Revision history for Perl extension Bio::Homology::InterologWalk.
 
+0.505   Fri Jul 1 14:02:02 2011
+	- naming corrections
+        - documentation update
+
 0.501   Sat May 7 14:02:02 2011
 	- compute_confidence_score(): boolean variables restored
         - corrected version bug

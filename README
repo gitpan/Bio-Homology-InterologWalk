@@ -1,17 +1,17 @@
-Bio-Homology-InterologWalk version 0.501
+Bio-Homology-InterologWalk version 0.505
 ========================================
 
-This document refers to version 0.501 of Bio::Homology::InterologWalk.
-This version was released May 7th, 2011.
+This document refers to version 0.505 of Bio::Homology::InterologWalk.
+This version was released July 1st, 2011.
 
 INSTALLATION-------------------------------------------------------------------------
 
 To install this module on your system, place the tarball archive file in a 
 temporary directory and call the following:
 
-% gunzip Bio-Homology-InterologWalk-0.501.tar.gz
-% tar xf Bio-Homology-InterologWalk-0.501.tar
-% cd Bio-Homology-InterologWalk-0.501
+% gunzip Bio-Homology-InterologWalk-0.505.tar.gz
+% tar xf Bio-Homology-InterologWalk-0.505.tar
+% cd Bio-Homology-InterologWalk-0.505
 % perl Makefile.PL
 % make
 % make test
@@ -160,7 +160,7 @@ the module. The meaning of the files is as follows:
 
 -getDirectInteractions.pl:  generate a dataset of direct PPIs based on the input ID list
 
--doScores.pl:  given a tsv obtained with doInterologWalk.pl, this file will compute an aggregated score for each (id, putative interactor) couple, representing a measure of the reliability of the interaction. The output of this script is a new TSV file containing a new compound score column
+-doScores.pl:  given a tsv obtained with doInterologWalk.pl, this file will compute a prioritisation index for each (id, putative interactor) couple, aggregating the available biological metadata for the interaction. The output of this script is a new TSV file containing a new prioritisation index column
                             
 REQUIRES: doInterologWalk.pl getDirectInteractions.pl
 

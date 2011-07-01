@@ -26,7 +26,7 @@ my $score_path;
 my $m_mtaxa;
 
 my $work_dir = '../Data/';
-my $infilename; #actual dataset to score
+my $infilename; #actual dataset to evaluate
 my $intactfile; #direct interactions obtained with getDirectInteractions.pl
 my $psimi_ont; #psi mi obo ontology from HUPO. See http://www.psidev.info/index.php?q=node/277
 GetOptions( 
@@ -94,10 +94,10 @@ if ( !$onto_graph ) {
 my ( $m_em, $m_it, $m_dm, $m_mdm ) =
   Bio::Homology::InterologWalk::Scores::get_mean_scores( $intact_path, $onto_graph );
 
-#4) compute actual scores
+#4) compute IPX
 print colored ( "Computing putative interaction scores...", 'green' ), "\n";
 
-my $RC_0 = Bio::Homology::InterologWalk::Scores::compute_confidence_score(
+my $RC_0 = Bio::Homology::InterologWalk::Scores::compute_prioritisation_index(
                                              input_path        => $in_path,
                                              score_path        => $score_path,
                                              output_path       => $out_path,
@@ -120,8 +120,6 @@ $out_path = $work_dir . $out_filename;
 $score_filename = $infilename . '.cons_hist';
 $score_path = $work_dir . $score_filename;
 
-#set up url
-my $intact_url = "http://www.ebi.ac.uk/Tools/webservices/psicquic/intact/webservices/current/";
 
 #-------------------------------------------------
 #EXPERIMENTAL - 

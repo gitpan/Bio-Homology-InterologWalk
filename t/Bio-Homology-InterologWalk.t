@@ -6,8 +6,8 @@ use Bio::Homology::InterologWalk;
 my $sourceorg = 'Mus musculus';
 my $destorg = 'all';
 my $url = "http://www.ebi.ac.uk/Tools/webservices/psicquic/intact/webservices/current/"; 
-my $test_data_dir = "t/testdata/";
-my $ont_path   = "scripts/Data/psi-mi.obo";
+my $test_data_dir = 't/testdata/';
+my $ont_path   = 'scripts/Data/psi-mi.obo';
 
 
 require_ok('Bio::Perl');
@@ -135,7 +135,7 @@ ok( $onto_graph->isa('GO::Model::Graph'), "parse_ontology() returns correct obje
 
 $in_path = $out_path;
 $out_path = $test_data_dir . "mmus.test6";
-my $rc_6 = Bio::Homology::InterologWalk::Scores::compute_confidence_score(
+my $rc_6 = Bio::Homology::InterologWalk::Scores::compute_prioritisation_index(
                                         input_path        => $in_path,
                                         output_path       => $out_path,
                                         term_graph        => $onto_graph,
