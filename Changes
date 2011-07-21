@@ -1,6 +1,12 @@
 Revision history for Perl extension Bio::Homology::InterologWalk.
 
-0.505   Fri Jul 1 14:02:02 2011
+0.510   Thu Jul 21 18:06:34 2011
+	- removed no_output flags throughout
+        - documentation update
+        - changed get_forward_orthologies() interface to explicity allow appending data to partial file after
+          remote connection failure
+
+0.505   Fri Jul 1 16:10:52 2011
 	- naming corrections
         - documentation update
 

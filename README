@@ -1,17 +1,17 @@
-Bio-Homology-InterologWalk version 0.505
+Bio-Homology-InterologWalk version 0.510
 ========================================
 
-This document refers to version 0.505 of Bio::Homology::InterologWalk.
-This version was released July 1st, 2011.
+This document refers to version 0.510 of Bio::Homology::InterologWalk.
+This version was released July 21st, 2011.
 
 INSTALLATION-------------------------------------------------------------------------
 
 To install this module on your system, place the tarball archive file in a 
 temporary directory and call the following:
 
-% gunzip Bio-Homology-InterologWalk-0.505.tar.gz
-% tar xf Bio-Homology-InterologWalk-0.505.tar
-% cd Bio-Homology-InterologWalk-0.505
+% gunzip Bio-Homology-InterologWalk-0.510.tar.gz
+% tar xf Bio-Homology-InterologWalk-0.510.tar
+% cd Bio-Homology-InterologWalk-0.510
 % perl Makefile.PL
 % make
 % make test
@@ -109,20 +109,20 @@ The Ensembl project is currently branched in two sub-projects:
     NOTE 1: All the API components ("ensembl", "ensembl-compara",
     "ensembl-variation", "ensembl-functgenomics") are required. 
 
-    NOTE 2: The module has been tested on Ensembl Vertebrates API & DB v. 58-61 
-    and EnsemblGenomes API & DB v. 5-7.
+    NOTE 2: The module has been tested on Ensembl Vertebrates API & DB v. 58-63 
+    and EnsemblGenomes API & DB v. 5-10.
 
 EXAMPLE==========================================
-e.g. to install API CORE V.61, do the following:
+e.g. to install API CORE V.63, do the following:
 
 log into the Ensembl CVS server at Sanger (using password: CVSUSER):
 
 $ cvs -d :pserver:cvsuser@cvs.sanger.ac.uk:/cvsroot/ensembl login
 Logging in to :pserver:cvsuser@cvs.sanger.ac.uk:2401/cvsroot/ensembl
 CVS password: CVSUSER
-Install the Ensembl Core Perl API for version 61
+Install the Ensembl Core Perl API for version 63
 
-$ cvs -d :pserver:cvsuser@cvs.sanger.ac.uk:/cvsroot/ensembl checkout -r branch-ensembl-61 ensembl
+$ cvs -d :pserver:cvsuser@cvs.sanger.ac.uk:/cvsroot/ensembl checkout -r branch-ensembl-63 ensembl
 
 =====================
 3. EXTRA PERL MODULES

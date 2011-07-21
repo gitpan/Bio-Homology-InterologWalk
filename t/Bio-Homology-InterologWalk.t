@@ -75,7 +75,6 @@ my $rc_1 = Bio::Homology::InterologWalk::get_direct_interactions(
                                                    input_path       => $in_path,
                                                    output_path      => $out_path,
                                                    url              => $url,
-                                                   no_output        => 1,
                                                    );
 ok( defined $rc_1,            "get_direct_interactions() return value appears to be correct" );
 
@@ -88,8 +87,7 @@ my $rc_2 = Bio::Homology::InterologWalk::get_forward_orthologies(
                                                  output_path     => $out_path,
                                                  source_org      => $sourceorg,
                                                  dest_org        => $destorg,
-                                                 hq_only         => 1,
-                                                 no_output       => 1,
+                                                 hq_only         => 1
                                               );
 ok( defined $rc_2,            "get_forward_orthologies() return value appears to be correct" );
 
@@ -99,7 +97,6 @@ my $rc_3 = Bio::Homology::InterologWalk::get_interactions(
                                           input_path      => $in_path,
                                           output_path     => $out_path,
                                           url             => $url,
-                                          no_output       => 1,
                                           );
 ok( defined $rc_3,            "get_interactions() return value appears to be correct" );
 
@@ -111,8 +108,7 @@ my $rc_4 = Bio::Homology::InterologWalk::get_backward_orthologies(
                                                   input_path    => $in_path,
                                                   output_path   => $out_path,
                                                   source_org    => $sourceorg,
-                                                  hq_only       => 1,
-                                                  no_output     => 1,
+                                                  hq_only       => 1
                                                   );
 ok( defined $rc_4,            "get_backward_orthologies() return value appears to be correct" );
 
@@ -121,8 +117,7 @@ $in_path = $out_path;
 $out_path = $test_data_dir . "mmus.test5";
 my $rc_5 = Bio::Homology::InterologWalk::do_counts(
                                    input_path  => $in_path,
-                                   output_path => $out_path,
-                                   no_output     => 1,
+                                   output_path => $out_path
                                    );
                                    
 ok( defined $rc_5,            "do_counts() return value appears to be correct" );
@@ -144,8 +139,7 @@ my $rc_6 = Bio::Homology::InterologWalk::Scores::compute_prioritisation_index(
                                         meanscore_it      => 1,
                                         meanscore_dm      => 1,
                                         meanscore_me_dm   => 1,
-                                        meanscore_me_taxa => 1,
-                                        no_output         => 1
+                                        meanscore_me_taxa => 1
 );
 
 ok( defined $rc_6,            "compute_confidence_score() return value appears to be correct" );
@@ -154,8 +148,7 @@ my $rc_7 = Bio::Homology::InterologWalk::Networks::do_network(
                                              registry    => $registry,
                                              data_file   => "mmus.test6", 
                                              data_dir    => $test_data_dir,
-                                             source_org  => $sourceorg,
-                                             no_output   => 1
+                                             source_org  => $sourceorg
                                              );
                                               
 ok( defined $rc_7,            "do_network() return value appears to be correct" );
@@ -165,8 +158,7 @@ my $rc_8 = Bio::Homology::InterologWalk::Networks::do_attributes(
                                                 data_file   => "mmus.test6",
                                                 start_file  => "mmus.txt",
                                                 data_dir    => $test_data_dir,
-                                                source_org  => $sourceorg,
-                                                no_output   => 1
+                                                source_org  => $sourceorg
                                                 );
                                                  
 ok( defined $rc_8,            "do_attributes()  return value appears to be correct" );

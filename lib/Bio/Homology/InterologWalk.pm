@@ -22,7 +22,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
-our $VERSION = '0.505';
+our $VERSION = '0.510';
 
 
 #################### main pod documentation begins ###################
@@ -33,7 +33,7 @@ Bio::Homology::InterologWalk - Retrieve, prioritise and visualize putative Prote
 
 =head1 VERSION
 
-This document describes version 0.505 of Bio::Homology::InterologWalk released July 1st, 2011
+This document describes version 0.510 of Bio::Homology::InterologWalk released July 21st, 2011
 
 =head1 SYNOPSIS
 
@@ -79,7 +79,7 @@ get orthologues of starting set:
 
 
 
-add interactors of  orthologues found by C<get_forward_orthologies()>:
+add interactors of  orthologues found by L</get_forward_orthologies>:
 
 
 
@@ -90,7 +90,7 @@ add interactors of  orthologues found by C<get_forward_orthologies()>:
                                        );
 
 
-add orthologues of interactors found by C<get_interactions()>:
+add orthologues of interactors found by L</get_interactions>:
 
   $RC = Bio::Homology::InterologWalk::get_backward_orthologies(
                                                registry    => $registry,
@@ -195,30 +195,30 @@ to the original species of interest.
 The final output is a list of B<putative interactors> for the initial gene set, plus several
 fields of supporting data. 
 
-C<Bio::Homology::InterologWalk> provides three main functions to carry out the basic walk, C<get_forward_orthologies()> , C<get_interactions()> and  
-C<get_backward_orthologies()>. These functions must be called strictly in sequential order in the user's script, as they process, analyse and attach data to the output 
-in a pipeline-like fashion, i.e. working on the output of the preceding function.
-
+C<Bio::Homology::InterologWalk> provides three main functions to carry out the basic walk, get_forward_orthologies() , get_interactions() and  
+get_backward_orthologies(). These functions must be called strictly in sequential order in the user's script, as they process, analyse and attach data to the output 
+in a pipeline-like fashion, i.e. working on the output of the previous function.
 
 =over 4
 
-=item  get_forward_orthologies
+=item  1
 
-This methods queries the initial gene list against one or more Ensembl DBs (using the Ensembl Perl API) and retrieves their orthologues, 
+get forward orthologies - This methods queries the initial gene list against one or more Ensembl DBs (using the Ensembl Perl API) and retrieves their orthologues, 
 plus a number of ancillary data fields ( conservation data, distance from ancestor, orthology type, etc) 
 
-=item get_interactions
+=item 2
 
-This queries the orthology list built in the previous stage against PSICQUIC-enabled PPI DBs using Rest. 
+get interactions - This queries the orthology list built in the previous stage against PSICQUIC-enabled PPI DBs using Rest. 
 This step will enrich the dataset built through C<get_forward_orthologies> with the interactors of those orthologues, if any, plus ancillary data (including several
 parameters describing the quality, nature and origin of the annotated interaction).
 
-=item get_backward_orthologies
+=item 3
 
-This queries the interactor list built in the previous stage against one or more Ensembl DBs (again  using the Ensembl Perl API)
+get backward orthologies - This queries the interactor list built in the previous stage against one or more Ensembl DBs (again  using the Ensembl Perl API)
 to find orthologues back in the original species of interest. It will also adds a number of supplementary information fields, specularly to what done in C<get_forward_orthologies>.  
 
 =back
+
 
 The output of this sequence of subroutines will be a TSV file containing zero or more entries, closely resembling  the MITAB tab delimited data exchange format from the  HUPO PSI (Proteomics Standards Initiative).
 Each row in the data file represents a binary putative interaction, plus currently 39 supplementary data fields.
@@ -318,8 +318,8 @@ The module requests that
 
 Ensembl API Version == Ensembl-DB set version. 
 
-This means that if you install e.g. API V.61, 
-you will only be able to get data from Ensembl Vertebrates / Metazoa databases V. 61. As the EnsemblGenomes DB releases are 
+This means that if you install e.g. API V.63, 
+you will only be able to get data from Ensembl Vertebrates / Metazoa databases V. 63. As the EnsemblGenomes DB releases are 
 B<one version behind> the Ensembl Vertebrate DB release, if you install the bleeding-edge Ensembl Vertebrate API, I<a matching EnsemblGenomes DB release might
 not be available yet>: you will still be able to use C<Bio::Homology::InterologWalk> to run an orthology walk using exclusively Ensembl Vertebrate DBs, but you
 will get an error if you try to choose metazoan databases. See L</setup_ensembl_adaptor> for further information.
@@ -363,7 +363,7 @@ Option (b) is the B<recommended> one.
 
 NOTE 1: All the API components  (C<ensembl>, C<ensembl-compara>, C<ensembl-variation>, C<ensembl-functgenomics>) are required.
 
-NOTE 2: The module has been tested on Ensembl Vertebrates API & DB v. 58-61 and EnsemblGenomes API & DB  v. 5-7.
+NOTE 2: The module has been tested on Ensembl Vertebrates API & DB v. 58-63 and EnsemblGenomes API & DB  v. 5-10.
 
 =head2 Bioperl
 
@@ -819,8 +819,8 @@ sub remove_duplicate_rows{
                                                          output_path   => $out_path,
                                                          source_org    => $sourceorg,
                                                          dest_org      => $destorg,
-                                                         hq_only       => 1
-                                                         no_output     => 0
+                                                         hq_only       => 0,
+                                                         append_data   => 0
                                                          );
  Purpose   : This is the core function to perform the orthology retrieval step of the 
              Interolog mapping algorithm. It will set up some important Ensembl components 
@@ -851,8 +851,10 @@ sub remove_duplicate_rows{
               functional conservation (while paralogues often cause neo/sub-functionalisation). 
               For further information see
               http://www.ensembl.org/info/docs/compara/homology_method.html 
-             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output during 
-              test. Default is 0.
+             -(OPTIONAL)append_data. Sometimes, the remote connection to Ensembl may fail during 
+              the data retrieval process. Setting this flag to 1 allows to continue the data 
+              collection from where it was interrupted. If unset, or set to 0, the old datafile 
+              (if existing) will be overwritten. 
  Throws    : -
  Comment   : 1)Currently the FULL SCIENTIFIC NAME of both the source species and the destination 
                species, as specified in Ensembl, is required.
@@ -879,7 +881,7 @@ sub get_forward_orthologies{
      my $in_path        = $args{input_path};
      my $out_path       = $args{output_path};
      my $onetoone_only  = $args{hq_only};
-     my $no_output      = $args{no_output};
+     my $continue_walk  = $args{append_data}; 
      
      my @ensembl_dbs;
      my $counter; 
@@ -911,33 +913,44 @@ sub get_forward_orthologies{
      #MANAGE FILES--------------
      open (my $in_data,  q{<}, $in_path) or croak("Unable to open $in_path : $!");
      my $out_data;
-     my $lastID;
-     if (-e $out_path){# if there's already an output file written
-          open ($out_data,  q{<}, $out_path) or croak("Unable to open $out_path : $!");
-          #call subroutine to:
-          #read last id from outfile
-          #find that last id in in_data
-          #start from there
-          my $line;
-          while (<$out_data>){
-               $line = $_;
-               if($line eq ''){# if there's an empty line at the end i dont want an empty element in last id
-                    last;
-               }
-               my @lineArray = split("\t",$line);
+
+     if ( $continue_walk ){ #if the user wants to append data to an already existing data file
+          if(-e $out_path){ # first we check if the datafile exists
+               my $lastID;
+               open ($out_data,  q{<}, $out_path) or croak("Unable to open $out_path : $!");
+               #call subroutine to:
+               #read last id from outfile
+               #find that last id in in_data
+               #start from there
+               my $pos=-1;
+               my $char;
+               my $already_nonblank = 0;
+               while ( seek ($out_data, $pos--, 2) ){
+                    read $out_data, $char, 1;
+                    last if ($char eq "\n" and $already_nonblank == 1);
+                    $already_nonblank = 1 if ($char ne "\n");
+               }  
+               my $last_line = <$out_data>;
+               chomp($last_line);
+               my @lineArray = split("\t",$last_line);
                $lastID = $lineArray[0];
-          }
-          close $out_data; #open with append
-          open ($out_data,  q{>>}, $out_path) or croak("Unable to open $out_path : $!");
-          print $out_data "\n";
-          while (<$in_data>){
-               my $currentID = $_;
-               chomp($currentID);
-               if ($currentID eq $lastID){
-                    last;
+               close $out_data; #open with append
+               open ($out_data,  q{>>}, $out_path) or croak("Unable to open $out_path : $!");
+               while (<$in_data>){
+                    my $currentID = $_;
+                    chomp($currentID);
+                    if ($currentID eq $lastID){
+                         last;
+                    }
                }
+               print "\n get_forward_orthologies(): CONTINUING from $lastID..\n";
+          }else{
+              croak("Unable to open $out_path : $!");
+              print("Starting a new interolog walk from the beginning of the input file..\n");
+              open ($out_data,  q{>}, $out_path) or croak("Unable to open $out_path : $!");
+              #set up header
+              print $out_data $HEADER_FWD_ORTH, "\n";
           }
-          print "get_forward_orthologies(): continuing from $lastID..\n";
      }else{
           open ($out_data,  q{>}, $out_path) or croak("Unable to open $out_path : $!");
           #set up header
@@ -972,7 +985,7 @@ sub get_forward_orthologies{
           my %genome_names;
           $counter_db = 0;
           
-          print("\n----Querying Ensembl Compara ($ensembl_db) for orthologues----\n") unless($no_output);
+          print("\n----Querying Ensembl Compara ($ensembl_db) for orthologues----\n");
           my $genome_db_adaptor = $registry->get_adaptor($ensembl_db,   'compara', 'GenomeDB');
           #We need to verify that the genome exists in the db
           my $all_genome_dbs = $genome_db_adaptor->fetch_all();
@@ -1008,7 +1021,7 @@ sub get_forward_orthologies{
 
           if($destorg eq "All"){#all species available
                my $num_of_genomes = @{$all_genome_dbs};
-               print("\n$num_of_genomes genomes considered in database: $ensembl_db. \n") unless($no_output);
+               print("\n$num_of_genomes genomes considered in database: $ensembl_db. \n");
           }else{    #one specific species selected
                my $dest_taxon = $NCBI_taxon_adaptor->fetch_node_by_name($destorg);
                my $dest_NCBI_taxon_ID = $dest_taxon->ncbi_taxid;
@@ -1066,24 +1079,24 @@ sub get_forward_orthologies{
                     }
                     next if (scalar(@$all_homologies) == 0);
                     
-                    print $gid, " ", ($gene->external_name || '-'), "\t" unless($no_output);
+                    print $gid, " ", ($gene->external_name || '-'), "\t";
                     $counter = _process_homologies(homology_query_id    =>    $gid, 
                                                    homology_vector       =>   $all_homologies, 
                                                    protein_adaptor       =>   $proteintree_adaptor,
                                                    outfile               =>   $out_data,
                                                    hq_only               =>   $onetoone_only
                                                    );
-                    print "..$counter orthologue(s).\n" unless($no_output);
+                    print "..$counter orthologue(s).\n";
                     $counter_db += $counter;
                }
           }
-          print "Found $counter_db orthologues in database: $ensembl_db\n" unless($no_output);
+          print "Found $counter_db orthologues in database: $ensembl_db\n";
           $global_count += $counter_db;
           seek($in_data,0,0);
     }
     close($in_data);
     close($out_data);   
-    print "\n**Found $global_count orthologues in all databases**\n" unless($no_output);
+    print "\n**Found $global_count orthologues in all databases**\n";
     if($global_count == 0){
          unlink($out_path);
          print("No orthologues found for $sourceorg. Exiting..\n");
@@ -1102,8 +1115,7 @@ sub get_forward_orthologies{
                                                   url            => $url,
                                                   no_spoke       => 1, 
                                                   exp_only       => 1, 
-                                                  physical_only  => 1,
-                                                  no_output      => 0 
+                                                  physical_only  => 1
                                                   );
  Purpose   : this methods allows  to query the Intact database using the REST interface. 
              IntAct is the Molecular Interaction database at the European Bioinformatics 
@@ -1136,9 +1148,7 @@ sub get_forward_orthologies{
               "physical association" 
               (MI:0915 in the PSI-MI controlled vocabulary) will be retained. I.e. if set, 
               this flag only allows physically associated PPIs to be retained and stored 
-              in the data file: colocalizations and genetic interactions will be discarded
-             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output 
-              during test. Default is 0.
+              in the data file: colocalizations and genetic interactions will be discarded.
  Throws    : -
  Comment   : -will soon be extended to work with other PSICQUIC-enabled protein interaction 
               dbs (for a list, see 
@@ -1160,7 +1170,6 @@ sub get_interactions{
      my $no_spokes       = $args{no_spoke};
      my $exp_only        = $args{exp_only};
      my $physical_only   = $args{physical_only};
-     my $no_output       = $args{no_output};
      
      if(!$in_path){
           print("get_direct_interactions(): no PSICQUIC url specified. Aborting..\n");
@@ -1225,13 +1234,13 @@ sub get_interactions{
           my $orthologueID = $rowHash->{$FN_orthologue_id};
      
           # do line-by-line processing.
-          print "$ID: Querying IntAct WS for $orthologueID.." unless($no_output);
+          print "$ID: Querying IntAct WS for $orthologueID..";
      
           my $queryTerm = $orthologueID;
           my $request = $url . $int_search_string . $queryTerm . $options ;
      
           $client->GET($request);
-          print "(", $client->responseCode(), ")" unless($no_output);
+          print "(", $client->responseCode(), ")";
   
           my $responseContent = $client->responseContent();
           if(!$responseContent){
@@ -1243,14 +1252,14 @@ sub get_interactions{
                #print "(", $client->responseCode(), ")";
                $responseContent = $client->responseContent();
                if(!$responseContent){
-                    print("..nothing..\n") unless($no_output);
+                    print("..nothing..\n");
                     next;
                }
           }
           $atleast_one_entry = 1;
           my @responsetoparse = split(/\n/,$responseContent);
           my $interactionsRetrieved = scalar @responsetoparse;
-          print "..Interactions found: ", $interactionsRetrieved, "\n" unless($no_output);
+          print "..Interactions found: ", $interactionsRetrieved, "\n";
      
           foreach my $intactInteraction (@responsetoparse){
                my @MITABDataRow = split("\t",$intactInteraction);
@@ -1275,7 +1284,7 @@ sub get_interactions{
                $DF_det_method      = $MITABDataRow[6];
                $DF_exp_method      = $MITABDataRow[24];
           
-               print("Interaction ($DF_interaction_id): $DF_acc_numb_a <-> $DF_acc_numb_b\n") unless($no_output);
+               print("Interaction ($DF_interaction_id): $DF_acc_numb_a <-> $DF_acc_numb_b\n");
           
                my $fullDataRow = join("\t",@oldDataVec,$DF_interaction_id,
                                                        $DF_acc_numb_a, $DF_acc_numb_b,
@@ -1311,8 +1320,7 @@ sub get_interactions{
                                                           output_path   => $out_path,
                                                           error_path    => $err_path,
                                                           source_org    => $sourceorg,    
-                                                          hq_only       => $onetoone,
-                                                          no_output     => 0
+                                                          hq_only       => $onetoone
                                                           );
  Purpose   : this routine mines orthologues back into the organism of interest. It accepts 
              as an input a data file containing interactions in the destination organism(s) 
@@ -1352,8 +1360,6 @@ sub get_interactions{
               If this is set, the subroutine will check the ids against ensembl to verify they're primary.
               If they're not, an up-to-dat id will be fetched remotely from Ensembl.
               http://www.ensembl.org/info/docs/compara/homology_method.html 
-             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output during 
-              test. Default is 0.
  Throws    : -
  Comment   : Destination species is automatically dealt with on a case-to-case basis.
            : 'ensembl_db' must be the same  for all the other subroutines in the pipeline
@@ -1373,7 +1379,6 @@ sub get_backward_orthologies{
      my $err_path        = $args{error_path};
      my $onetoone_only   = $args{hq_only};
      my $check_ids       = $args{check_ids};#optional
-     my $no_output       = $args{no_output};
      
      my $out_data; 
      my $err_data;
@@ -1445,7 +1450,7 @@ sub get_backward_orthologies{
                                       SELECT count(*)
                                          FROM int
                                 });
-     print "Total number of interactions: $rowCount.\n" unless($no_output);
+     print "Total number of interactions: $rowCount.\n";
      
      while (my $row = $sth->fetchrow_hashref) {
           my $DF_taxon_a = $row->{$FN_taxon_a};
@@ -1457,7 +1462,7 @@ sub get_backward_orthologies{
      
      @NCBItaxa = sort(keys(%NCBItaxa_seen));
      $unique_taxa += 1 foreach (@NCBItaxa);
-     print "Total Number of Unique NCBI taxa IDs: $unique_taxa.\n" unless($no_output);
+     print "Total Number of Unique NCBI taxa IDs: $unique_taxa.\n";
      $sth->finish;
      $dbh->disconnect;
      #=============================================================================
@@ -1466,7 +1471,7 @@ sub get_backward_orthologies{
           my %genome_names;
           my $all_genome_dbs;
           
-          print("\n----Querying Ensembl Compara ($ensembl_db) for orthologues back in $sourceorg----\n") unless($no_output);
+          print("\n----Querying Ensembl Compara ($ensembl_db) for orthologues back in $sourceorg----\n");
           #CHECK THE GENOME ID/DB COMBO====
           #first we get the id from the source organism name
           my $NCBI_taxon_adaptor = $registry->get_adaptor($ensembl_db, "compara", "NCBITaxon");
@@ -1569,9 +1574,9 @@ sub get_backward_orthologies{
                                  || $NCBItaxon->short_name
                                  || $NCBItaxon->ensembl_alias
                                  || '-';
-               print "\n============\n" unless($no_output);
-               print "$NCBItaxon_name ($NCBItaxonID)\n" unless($no_output);
-               print "============\n" unless($no_output);
+               print "\n============\n";
+               print "$NCBItaxon_name ($NCBItaxonID)\n";
+               print "============\n";
                
                my $gene_adaptor = $registry->get_adaptor($NCBItaxon_name, "core", "Gene");
                if(!$gene_adaptor){
@@ -1637,7 +1642,7 @@ sub get_backward_orthologies{
                     if($candidate){
                          $member = $member_adaptor->fetch_by_source_stable_id("ENSEMBLGENE", $candidate);
                          if(!$member){
-                              print "$DF_interaction_id-($DF_acc_numb_a, $DF_acc_numb_b): fetch_by_source_stable_id returns no member object.\n" unless($no_output);
+                              print "$DF_interaction_id-($DF_acc_numb_a, $DF_acc_numb_b): fetch_by_source_stable_id returns no member object.\n";
                               if($err_path){
                                    print $err_data $entry, "\n";
                                    $entries_err_found = 1;
@@ -1653,8 +1658,7 @@ sub get_backward_orthologies{
                                                            protein_adaptor     =>   $proteintree_adaptor,
                                                            outfile             =>   $out_data,
                                                            datavector          =>   $entry, 
-                                                           hq_only             =>   $onetoone_only,
-                                                           no_output           =>   $no_output
+                                                           hq_only             =>   $onetoone_only
                                                            );
                          $global_count += $orthology_count;
                          next;
@@ -1715,7 +1719,7 @@ sub get_backward_orthologies{
                     
 #                    else{
 #                         #you might want to pack this into a sub
-#                         print("Converting all IDs in Uniprot KB IDs..\n") unless($no_output);
+#                         print("Converting all IDs in Uniprot KB IDs..\n");
 #                         
 #                         $candidate = _compare_uniprotkbids($gene_adaptor, $DF_orthologue_id, $DF_acc_numb_a, $DF_acc_numb_b);
 #                         if(!$candidate){
@@ -1733,7 +1737,7 @@ sub get_backward_orthologies{
 #                    }
                     
                     if(!$member){
-                         print "$DF_interaction_id-($DF_acc_numb_a, $DF_acc_numb_b): no member object. Skipping..\n" unless($no_output);
+                         print "$DF_interaction_id-($DF_acc_numb_a, $DF_acc_numb_b): no member object. Skipping..\n";
                          if($err_path){
                             print $err_data $entry, "\n";
                             $entries_err_found = 1;
@@ -1749,8 +1753,7 @@ sub get_backward_orthologies{
                                                            protein_adaptor     =>   $proteintree_adaptor,
                                                            outfile             =>   $out_data,
                                                            datavector          =>   $entry, 
-                                                           hq_only             =>   $onetoone_only,
-                                                           no_output           =>   $no_output
+                                                           hq_only             =>   $onetoone_only
                                                            );
                     $global_count += $orthology_count;
                }
@@ -1813,8 +1816,7 @@ sub _fuzzy_match {
                                                                  check_ids       => 1,   
                                                                  no_spoke        => 1, 
                                                                  exp_only        => 1, 
-                                                                 physical_only   => 1, 
-                                                                 no_output       => 0 
+                                                                 physical_only   => 1
                                                                  );
  Purpose   : this methods allows  to query the Intact database using the REST interface. 
              IntAct is the Molecular Interaction database at the European Bioinformatics 
@@ -1864,9 +1866,7 @@ sub _fuzzy_match {
               (MI:0915 in the PSI-MI controlled vocabulary) will be retained. I.e. 
               if set, this flag only allows 
               physically associated PPIs to be retained and stored in the data file: 
-              colocalizations and genetic interactions will be discarded
-             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output 
-              during test. Default is 0.
+              colocalizations and genetic interactions will be discarded.
  Throws    : -
  Comment   : -
 
@@ -1886,7 +1886,6 @@ sub get_direct_interactions{
      my $no_spokes       = $args{no_spoke};
      my $exp_only        = $args{exp_only};
      my $physical_only   = $args{physical_only};
-     my $no_output       = $args{no_output};
      
      my $ID_OUT; #the object of our search
      
@@ -1959,11 +1958,11 @@ sub get_direct_interactions{
                $idsignature = substr($ID, 0, 1) . substr($ID, 1, 1) . substr($ID, 1, 1);
           }
           
-          print "$ID: Querying IntAct WS for $ID.." unless($no_output);
+          print "$ID: Querying IntAct WS for $ID..";
           my $request = $url . $int_search_string.  $ID . $options;
           
           $client->GET($request);
-          print "(", $client->responseCode(), ")" unless($no_output);
+          print "(", $client->responseCode(), ")";
           
           my $responseContent = $client->responseContent();
           if(!$responseContent){
@@ -1973,14 +1972,14 @@ sub get_direct_interactions{
                $client->GET($request);
                $responseContent = $client->responseContent();
                if(!$responseContent){
-                    print("..nothing..\n") unless($no_output);
+                    print("..nothing..\n");
                     next;    
                }
           }
           $atleast_one_entry = 1;
           my @responsetoparse = split(/\n/,$responseContent);
           my $interactionsRetrieved = scalar @responsetoparse;
-          print "..Interactions found: ", $interactionsRetrieved, "\n" unless($no_output);
+          print "..Interactions found: ", $interactionsRetrieved, "\n";
           
           foreach my $intactInteraction (@responsetoparse){
                my @MITABDataRow = split("\t",$intactInteraction);
@@ -2027,7 +2026,7 @@ sub get_direct_interactions{
                #TODO REVIEW THIS                                    
 
                if($ID_OUT){
-                    print("Interaction ($DF_interaction_id): $ID <--> $ID_OUT\n") unless($no_output);
+                    print("Interaction ($DF_interaction_id): $ID <--> $ID_OUT\n");
                     my $fullDataRow = join("\t",$ID,$DF_interaction_id,
                                         $DF_acc_numb_a, $DF_acc_numb_b,
                                         $DF_alt_id_a, $DF_alt_id_b,
@@ -2060,7 +2059,7 @@ sub get_direct_interactions{
                                                             );
                
                 #RIVEDI QUA!!
-#               print("Converting all IDs in Uniprot KB IDs..\n") unless($no_output);
+#               print("Converting all IDs in Uniprot KB IDs..\n");
 #                         
 #               my $candidate = Bio::Homology::InterologWalk::_compare_uniprotkbids($gene_adaptor, $ID, $DF_acc_numb_a, $DF_acc_numb_b);
 #               if($candidate){
@@ -2093,7 +2092,7 @@ sub get_direct_interactions{
                     next;
                }
 
-               print("Interaction ($DF_interaction_id): $ID <--> $ID_OUT\n") unless($no_output);
+               print("Interaction ($DF_interaction_id): $ID <--> $ID_OUT\n");
                my $fullDataRow = join("\t",$ID,$DF_interaction_id,
                                              $DF_acc_numb_a, $DF_acc_numb_b,
                                              $DF_alt_id_a, $DF_alt_id_b,
@@ -2104,7 +2103,7 @@ sub get_direct_interactions{
                print $out_data $fullDataRow, "\n";
           }
      }
-     print("Missed: $missed\n") unless($no_output);
+     print("Missed: $missed\n");
      close $in_data;
      if(!$atleast_one_entry){
         unlink($out_path);
@@ -2121,8 +2120,7 @@ sub get_direct_interactions{
  Usage     : $RC = Bio::Homology::InterologWalk::do_counts(
                                            input_path  => $in_path,
                                            output_path => $out_path,
-                                           header      => 'standard',
-                                           no_output   => 0
+                                           header      => 'standard'
                                            );
  Purpose   : The purpose of this routine is to scan the data produced by get_backward_orthologies() 
              or get_direct_interactions() (optionally cleaned up of duplicates by 
@@ -2154,9 +2152,7 @@ sub get_direct_interactions{
                     (the header will be longer)
                  2. 'direct':   when the routine is used to compute counts on a real db interactions 
                     file (the header is shorter)
-               No field provided: default is 'standard'
-             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output during test. 
-              Default is 0.
+               No field provided: default is 'standard'.
  Throws    : -
  Comment   : -
 
@@ -2170,7 +2166,6 @@ sub do_counts{
      my $in_path       = $args{input_path};
      my $out_path      = $args{output_path};
      my $header_type   = $args{header};
-     my $no_output     = $args{no_output};
      
      $header_type = 'standard' if(!$header_type);
      #MANAGE FILES
@@ -2248,8 +2243,8 @@ sub do_counts{
      #    print $interaction, " : ", $idSeen{$interaction}, "\n";
      #}
      
-     print("\nTotal number of interactions (including duplicates): $rowCount\n") unless($no_output);
-     print("Total number of interactions involving UNIQUE (initial_id, final_id) pairs: $idNumber\n") unless($no_output);
+     print("\nTotal number of interactions (including duplicates): $rowCount\n");
+     print("Total number of interactions involving UNIQUE (initial_id, final_id) pairs: $idNumber\n");
           
      #======================
      #Printing new data file
@@ -2990,7 +2985,7 @@ sub _get_ensembl_id_from_uniprotkb_id{
 #     my $interactorid   = $args{acc_numb};
 #     my $name           = $args{protein_name};
 #     my $aliasvector    = $args{aliases};
-#     my $no_output      = $args{no_output};
+#  
 #
 #     my $ensemblid;
 #     
@@ -3003,15 +2998,15 @@ sub _get_ensembl_id_from_uniprotkb_id{
 #     if(!$ensemblid){  #name
 #          #I want to know how many I couldn't get immediately by querying simply the id.
 #          $ENSEMBLIDFAILED = 1;    
-#          print "$ebi_id-($interactorid): query by accession number $interactorid ambiguous/empty, trying name..\n" unless($no_output);
+#          print "$ebi_id-($interactorid): query by accession number $interactorid ambiguous/empty, trying name..\n";
 #          $ensemblid = _query_generic_id($gene_adaptor, $orthologueid, $name);
 #          if(!$ensemblid){ #aliases
-#               print "$ebi_id-($interactorid): query by name $name ambiguous/empty, trying aliases..\n" unless($no_output);
+#               print "$ebi_id-($interactorid): query by name $name ambiguous/empty, trying aliases..\n";
 #               my @aliases = _get_vector_from_string($aliasvector);
 #               foreach my $alias (@aliases){
 #                    $ensemblid = _query_generic_id($gene_adaptor, $orthologueid, $alias);
 #                    if($ensemblid){
-#                         print "Found by alias: $alias\n" unless($no_output);
+#                         print "Found by alias: $alias\n";
 #                         return $ensemblid;
 #                    }
 #               }
@@ -3019,14 +3014,14 @@ sub _get_ensembl_id_from_uniprotkb_id{
 #               foreach my $alias (@aliases){
 #                    my $stableid = $gene_adaptor->fetch_by_stable_id($alias);
 #                    if (defined $stableid){
-#                         print("Found by alias: $alias\n") unless($no_output);
+#                         print("Found by alias: $alias\n");
 #                         $ensemblid = $stableid->stable_id;
 #                         return $ensemblid;
 #                    }
 #               }
 #               
 #               if(!$ensemblid){
-#                    print "$ebi_id-($interactorid): name/aliases did not help, trying external_db string..\n" unless($no_output);
+#                    print "$ebi_id-($interactorid): name/aliases did not help, trying external_db string..\n";
 #                    #last chance. I'll choose  'curated'/'automatic' over 'clone based'
 #                    my $gArray = $gene_adaptor->fetch_all_by_external_name($interactorid);
 #                    foreach my $gene (@$gArray){
@@ -3037,7 +3032,7 @@ sub _get_ensembl_id_from_uniprotkb_id{
 #                              return ($gene->stable_id);
 #                         }
 #                    }
-#                    print("$ebi_id-($interactorid): no way to distinguish multiple genes in array. Switching to UniprotKB ids..\n") unless($no_output);
+#                    print("$ebi_id-($interactorid): no way to distinguish multiple genes in array. Switching to UniprotKB ids..\n");
 #                    return;
 #               }
 #          }
@@ -3127,7 +3122,6 @@ sub _process_homologies{
      my $output_file    = $args{outfile};
      my $old_data_row   = $args{datavector};
      my $oo_only        = $args{hq_only};
-     my $no_output      = $args{no_output};
      
      my $counter = 0;
      foreach my $homology (@{$homologies}){  
@@ -3219,7 +3213,7 @@ sub _process_homologies{
                                    $DF_orthologue_id,$DF_oname, $DF_odesc, 
                                    $DF_opi, $DF_dnds, $DF_nndist,
                                    $DF_fsa_y, $DF_fsa_x);
-                    print "Putative interactor found: $DF_oname ($DF_orthologue_id)\n" unless($no_output);
+                    print "Putative interactor found: $DF_oname ($DF_orthologue_id)\n";
                }else{ #get_forward_orthologies - species_x is our species of interest
                     $data_line = join("\t",$init_id, 
                                    $DF_orthologue_id,$DF_oname, $DF_odesc, 
@@ -3302,7 +3296,7 @@ my %first_level_hash = (
 );
 #experimental method
 my $SPOKE = 0;
-my $NONSPOKE = 7;
+my $NONSPOKE = 5;
 my $ONETONEPATH = 7;
 my $NOT_ONETOONEPATH = 0;
 my $INTERACTIONWEIGHT = 1;
@@ -3537,8 +3531,7 @@ sub _get_multiple_taxa_mean_score{
                                                         meanscore_it      => $m_it,
                                                         meanscore_dm      => $m_dm,
                                                         meanscore_me_dm   => $m_mdm,
-                                                        meanscore_me_taxa => $m_mtaxa,
-                                                        no_output         => 0
+                                                        meanscore_me_taxa => $m_mtaxa
                                                         );
  Purpose   : This is used to analyse several ancillary data fields obtained alongside the actual 
              putative PPI IDs and collate them into an Interolog Prioritisation Index (IPX), to associate a
@@ -3572,8 +3565,6 @@ sub _get_multiple_taxa_mean_score{
              -meanscore_dm : mean detection method score for normalisation   
              -meanscore_me_dm : mean 'multiple detection methods' score for normalisation
              -meanscore_me_taxa : mean 'multiple taxa' score for normalisation
-             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output during test. 
-              Default is 0.
  Throws    : -
  Comment   : -
 
@@ -3593,7 +3584,6 @@ sub compute_prioritisation_index{
      my $mean_det_method_score     = $args{meanscore_dm};
      my $mean_multiple_dm_score    = $args{meanscore_me_dm}; #multiple evidence, detection method 
      my $mean_multiple_taxa_score  = $args{meanscore_me_taxa}; #multiple evidence, taxa
-     my $no_output                 = $args{no_output};
      
      if(!$graph){
           print("compute_prioritisation_index(): PSI-MI graph representation not found. Aborting..\n");
@@ -3685,11 +3675,11 @@ sub compute_prioritisation_index{
           #####################
           
           #Interaction type============================
-          my $intTypeScore    = _score_interaction($graph, $intType, $no_output);
+          my $intTypeScore    = _score_interaction($graph, $intType);
           $intTypeScore       = $intTypeScore / $mean_int_type_score;
           
           #Detection method============================
-          my $detScore   = _score_interaction($graph, $detMethod, $no_output);
+          my $detScore   = _score_interaction($graph, $detMethod);
           $detScore      = $detScore / $mean_det_method_score;
           
           my $multipleDMScore = $multipleDM / $mean_multiple_dm_score;
@@ -4318,7 +4308,7 @@ sub _get_ont_id{
 #
 #See Also   : 
 sub _score_interaction{
-     my ($graph, $termToScore, $no_output) = @_;
+     my ($graph, $termToScore) = @_;
      my $globalScore = 0;
      my @pathScores = (); #in case there are more paths leading up to different metaconcepts. I'll extract the max from here
      
@@ -4332,10 +4322,8 @@ sub _score_interaction{
      #if the term is already one of the scored ones, there's no need to traverse the ontology. Just get the score
      if(exists($first_level_hash{$termID})){
           $globalScore += $first_level_hash{$termID};
-          unless($no_output){
-               printf "\n\n%s -> ", $termID;
-               print "FOUND\n\n";
-          }
+          printf "\n\n%s -> ", $termID;
+          print "FOUND\n\n";
           return $globalScore; 
      }
 
@@ -4355,39 +4343,35 @@ sub _score_interaction{
      #    2.a)all are the same (e.g. all "experimental"). It means the branching is below. Then use anyone of them
      #    2.b)they're different (e.g. "experimental" and "inferred"). Use the one with the highest confidence (experimental)
      #only one path has the root concept: straightforward.
-     print "\nClimbing ontology in search of known meta-concepts..\n" unless($no_output);
+     print "\nClimbing ontology in search of known meta-concepts..\n";
      
      if(scalar @$paths == 1){
-          print "Only one path to top exists. Traversing it..\n\n" unless($no_output);
+          print "Only one path to top exists. Traversing it..\n\n";
           my $tempAcc;
           $graph->iterate(sub {
                                    $term=shift->term;
                                    $tempAcc = $term->acc;
-                                   unless($no_output){
-                                       printf "%s %s -> \n", $tempAcc,$term->name; 
-                                   }
+                                   printf "%s %s -> \n", $tempAcc,$term->name; 
                                    if($first_level_hash{$tempAcc}){
                                         $globalScore += $first_level_hash{$tempAcc};
-                                        print "FOUND\n" unless($no_output);
+                                        print "FOUND\n";
                                         return;
                                    }
                               },
                          {direction=>'up',acc=>$termID});
                          
      }elsif(scalar @$paths > 1){
-          print "More than one path to top. Traversing all of them..\n\n" unless($no_output);   
+          print "More than one path to top. Traversing all of them..\n\n";   
           for my $pathtoTop (@{$paths}){
                my $termlist = $pathtoTop->term_list;
-               print "$termName", " ->> " unless($no_output);
+               print "$termName", " ->> ";
                for my $terminPath (@{$termlist}){
-                    unless($no_output){
-                         printf "%s %s -> \n", $terminPath->acc,$terminPath->name;   
-                    }
+                    printf "%s %s -> \n", $terminPath->acc,$terminPath->name;
                     my $tempAcc = $terminPath->acc;
                     if($first_level_hash{$tempAcc}){
                          push(@pathScores, $first_level_hash{$tempAcc});
                          #$global_DetMethod_Score += $first_level_hash{$tempAcc};
-                         print "FOUND. Stopping search on this path.\n" unless($no_output);
+                         print "FOUND. Stopping search on this path.\n";
                          $globalScore = max(@pathScores);
                          return $globalScore;
                     }
@@ -4396,7 +4380,7 @@ sub _score_interaction{
           $globalScore = max(@pathScores);
           
      }else{#no paths
-          print "No paths to top..Skipping\n" unless($no_output);
+          print "No paths to top..Skipping\n";
           return 0;
      }
      return $globalScore;
@@ -4534,8 +4518,7 @@ use Carp qw(croak);
                                                        source_org     => $sourceorg,
                                                        orthology_type => $orthtype,
                                                        expand_taxa    => 1,
-                                                       ensembl_db     => $ensembl_db,
-                                                       no_output      => 0
+                                                       ensembl_db     => $ensembl_db
                                                        );
  Purpose   : This function  writes a .SIF file according to this cytoscape specification in:
              http://cytoscape.org/cgi-bin/moin.cgi/Cytoscape_User_Manual/Network_Formats.
@@ -4568,9 +4551,7 @@ use Carp qw(croak);
               the putative PPI has been projected will be retained.
               if this is set to true, ensemb_db MUST also be set
              -(OPTIONAL) ensembl_db: only required if expand_taxa is set. For allowed values, 
-              see get_forward_orthologies()
-             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output during
-              test. Default is 0.
+              see get_forward_orthologies().
  Throws    : -
  Comment   : in order to account for the fact that the edges of the network are undirected 
              (eg A-B = B-A), I can either
@@ -4592,7 +4573,6 @@ sub do_network{
      my $ortology_class     = $args{orthology_type};
      my $expand_taxa        = $args{expand_taxa}; #default no     
      my $ensembl_db         = $args{ensembl_db};
-     my $no_output          = $args{no_output};
      
      my $query;
      my $scored;
@@ -4653,16 +4633,16 @@ sub do_network{
      
      #read the header, check whether the prioritisation index is present, and create the following query accordingly
      #I'll read the header and see if there's a field containing IPX. To be improved upon
-     print("\nChecking for the presence of IPX field in the input TSV data..\n") unless($no_output);
+     print("\nChecking for the presence of IPX field in the input TSV data..\n");
      my $old_header = <$in_data>;
      close $in_data;
      if($old_header =~ /$FN_prioritisation_index/){ #need to check if the score had been computed
           $scored = 1;
-          print("IPX present, including it in the cytoscape network file..\n") unless($no_output);
+          print("IPX present, including it in the cytoscape network file..\n");
           print $out_data $HEADER_SIF, "\t", $FN_prioritisation_index, "\n";
           
           if($expand_taxa){ #IPX, taxon info
-              print("Expanding binary interactions through taxon information..\n\n") unless($no_output);
+              print("Expanding binary interactions through taxon information..\n\n");
               if($ortology_class eq "onetoone"){
                    $query = "SELECT $FN_initid,$FN_interactor_id,$FN_prioritisation_index, $FN_taxon_a
                              FROM int
@@ -4678,7 +4658,7 @@ sub do_network{
                   return;
               }
           }else{ #IPX, no taxon
-              print("Ignoring taxon information..\n\n") unless($no_output);
+              print("Ignoring taxon information..\n\n");
               if($ortology_class eq "onetoone"){
                    $query = "SELECT $FN_initid,$FN_interactor_id,$FN_prioritisation_index
                              FROM int
@@ -4693,7 +4673,7 @@ sub do_network{
               }
           }
      }else{ 
-          print("IPX not found..\n\n") unless($no_output);
+          print("IPX not found..\n\n");
           print $out_data $HEADER_SIF, "\n";
           
           if($expand_taxa){ #no IPX, taxon info
@@ -4815,7 +4795,7 @@ sub do_network{
                }
           }
           print $out_data $new_row, "\n";
-          print $new_row, "\n" unless($no_output);
+          print $new_row, "\n";
      }
      $sth->finish();
      $dbh->disconnect();
@@ -4833,7 +4813,6 @@ sub do_network{
                                                      data_dir    => $work_dir,
                                                      source_org  => $sourceorg,
                                                      label_type  => 'extname'
-                                                     no_output   => 0
                                                      );
  Purpose   : This is needed to create two node attribute files to 
              go with the .sif network created by do_networks(). 
@@ -4859,8 +4838,6 @@ sub do_network{
              -source_org : source organism name (eg: "Mus musculus")
              -(OPTIONAL) label_type: what kind of human readable string to employ. Options 
               are 'extname' (external name) and 'description'. Default is 'extname'
-             -(OPTIONAL) no_output :  suppresses screen output. Used for clearer output 
-              during test. Default is 0.
  Throws    : -
  Comment   : -
 
@@ -4876,7 +4853,6 @@ sub do_attributes{
      my $data_dir         = $args{data_dir};
      my $sourceorg        = $args{source_org}; 
      my $label_type       = $args{label_type};
-     my $no_output        = $args{no_output};
      
      my %seen = ();
      
@@ -4975,12 +4951,12 @@ sub do_attributes{
                     if(scalar(@$genesArray) == 1){ 
                          $gene = @$genesArray[0];
                     }elsif(scalar(@$genesArray) > 1){
-                         print("do_attributes(): warning - $stableid has ambiguous gene object in Ensemlb. Choosing the first.\n") unless($no_output);
+                         print("do_attributes(): warning - $stableid has ambiguous gene object in Ensemlb. Choosing the first.\n");
                          $gene = @$genesArray[0];
                     }else{ #no gene object, leaving ID
-                         print("do_attributes(): no gene object found for id: $stableid. Leaving as is.\n") unless($no_output);
+                         print("do_attributes(): no gene object found for id: $stableid. Leaving as is.\n");
                          $label = $stableid;
-                         print "$stableid\t=\t$label   ($novelty)\n" unless($no_output);
+                         print "$stableid\t=\t$label   ($novelty)\n";
                          print $out_data_name $stableid, "\t", "=", "\t", $label, "\n";
                          next;
                     }
@@ -5014,7 +4990,7 @@ sub do_attributes{
                return;
           }
           $label = $stableid if(!$label);
-          print "$stableid\t=\t$label   ($novelty)\n" unless($no_output);
+          print "$stableid\t=\t$label   ($novelty)\n";
           print $out_data_name $stableid, "\t", "=", "\t", $label, "\n";
      }
      close $out_data_name;
@@ -5051,7 +5027,14 @@ Giuseppe Gallone  E<lt>ggallone@cpan.orgE<gt>
 
 CPAN ID: GGALLONE
 
-University of Edinburgh    
+University of Edinburgh
+
+=head1 PUBLICATION
+
+If you use Bio::Homology::InterologWalk in your work, please cite
+
+Gallone G, Simpson TI, Armstrong JD and Jarman AP (2011) Bio::Homology::InterologWalk - A Perl module to build putative protein-protein interaction networks through interolog mapping
+BMC Bioinformatics 2011, 12:289 doi:10.1186/1471-2105-12-289  
 
 =head1 LICENSE AND COPYRIGHT
 
