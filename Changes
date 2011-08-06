@@ -1,5 +1,8 @@
 Revision history for Perl extension Bio::Homology::InterologWalk.
 
+0.511   Sat Aug 6 10:56:09 2011
+        - updated species hash in main module
+
 0.510   Thu Jul 21 18:06:34 2011
 	- removed no_output flags throughout
         - documentation update

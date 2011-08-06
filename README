@@ -1,17 +1,17 @@
-Bio-Homology-InterologWalk version 0.510
+Bio-Homology-InterologWalk version 0.511
 ========================================
 
-This document refers to version 0.510 of Bio::Homology::InterologWalk.
-This version was released July 21st, 2011.
+This document refers to version 0.511 of Bio::Homology::InterologWalk.
+This version was released August 6th, 2011.
 
 INSTALLATION-------------------------------------------------------------------------
 
 To install this module on your system, place the tarball archive file in a 
 temporary directory and call the following:
 
-% gunzip Bio-Homology-InterologWalk-0.510.tar.gz
-% tar xf Bio-Homology-InterologWalk-0.510.tar
-% cd Bio-Homology-InterologWalk-0.510
+% gunzip Bio-Homology-InterologWalk-0.511.tar.gz
+% tar xf Bio-Homology-InterologWalk-0.511.tar
+% cd Bio-Homology-InterologWalk-0.511
 % perl Makefile.PL
 % make
 % make test

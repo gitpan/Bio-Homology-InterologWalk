@@ -22,7 +22,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
-our $VERSION = '0.510';
+our $VERSION = '0.511';
 
 
 #################### main pod documentation begins ###################
@@ -33,7 +33,7 @@ Bio::Homology::InterologWalk - Retrieve, prioritise and visualize putative Prote
 
 =head1 VERSION
 
-This document describes version 0.510 of Bio::Homology::InterologWalk released July 21st, 2011
+This document describes version 0.511 of Bio::Homology::InterologWalk released August 6th, 2011
 
 =head1 SYNOPSIS
 
@@ -521,14 +521,22 @@ my %ensembl_db_lookup = (
 			                        'protists'],
             'pan_homology'    => 'pan_homology',
             
-            'Aedes'             => 'metazoa',
-            'Anopheles'         => 'metazoa',
-            'Caenorhabditis'    => 'metazoa',
-            'Culex'             => 'metazoa',
-            'Drosophila'        => 'metazoa',
-            'Ixodes'            => 'metazoa',
-            'Pediculus'         => 'metazoa',
-            'Pristionchus'      => 'metazoa',
+            'Acyrthosiphon'        => 'metazoa',
+            'Aedes'                => 'metazoa',
+            'Anopheles'            => 'metazoa',
+            'Apis'                 => 'metazoa',
+            'Caenorhabditis'       => 'metazoa',
+            'Culex'                => 'metazoa',
+            'Daphnia'              => 'metazoa',
+            'Drosophila'           => 'metazoa',
+            'Ixodes'               => 'metazoa',
+            'Nematostella'         => 'metazoa',
+            'Pediculus'            => 'metazoa',
+            'Pristionchus'         => 'metazoa',
+            'Schistosoma'          => 'metazoa',
+            'Pristionchus'         => 'metazoa',
+            'Strongylocentrotus'   => 'metazoa',
+            'Trichoplax'           => 'metazoa',
             
             'Arabidopsis'     => 'plants',
             'Brachypodium'    => 'plants',
@@ -543,10 +551,15 @@ my %ensembl_db_lookup = (
             'Phaeodactylum'   => 'protists',
             
             'Aspergillus'          => 'fungi',
+            'Fusarium'             => 'fungi',
+            'Gibberella'           => 'fungi',
+            'Nectria'              => 'fungi',
             'Neosartorya'          => 'fungi',
             'Neurospora '          => 'fungi',
+            'Puccinia'             => 'fungi',
             'Saccharomyces'        => 'fungi',
-            'Schizosaccharomyces ' => 'fungi',
+            'Schizosaccharomyces'  => 'fungi',
+            'Ustilago'             => 'fungi',
             
             'Bacillus'         => 'bacteria',
             'Borrelia'         => 'bacteria',
