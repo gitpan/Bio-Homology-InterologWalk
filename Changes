@@ -1,5 +1,12 @@
 Revision history for Perl extension Bio::Homology::InterologWalk.
 
+0.52    Wed Aug 17 12:09:02 2011
+        - removed hard-coded species hash
+        - updated interface and documentation
+        - added warnings for unsupported usage of non-metazoan Ensemblgenomes species
+        - get_backward_orthologies(): introduced basic support for NCBI taxonomy climb for cases of unrecognised taxon
+          scientific name/taxon id
+
 0.511   Sat Aug 6 10:56:09 2011
         - updated species hash in main module
 

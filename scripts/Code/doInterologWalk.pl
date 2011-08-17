@@ -77,8 +77,8 @@ $out_path = $work_dir . $out_filename;
 #Ensembl dbs to connect to. Options: 
 #a) ensembl: vertebrate compara
 #b) pan_homology: pan homology db
-#c) ensemblgenomes: ensembl compara genomes. To query:
-#d) all: ensembl compara vertebrates + ensembl genomes
+#c) metazoa: ensemblgenomes metazoan db.
+#d) all: ensembl vertebrates + ensemblgenomes metazoa
 my $ensembl_db = 'ensembl';
 
 #1) set up the Ensembl compara connection

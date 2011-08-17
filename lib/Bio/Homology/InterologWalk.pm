@@ -22,7 +22,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
-our $VERSION = '0.511';
+our $VERSION = '0.52';
 
 
 #################### main pod documentation begins ###################
@@ -33,7 +33,7 @@ Bio::Homology::InterologWalk - Retrieve, prioritise and visualize putative Prote
 
 =head1 VERSION
 
-This document describes version 0.511 of Bio::Homology::InterologWalk released August 6th, 2011
+This document describes version 0.52 of Bio::Homology::InterologWalk released August 17th, 2011
 
 =head1 SYNOPSIS
 
@@ -512,67 +512,6 @@ my $HEADER_DIRECT             =    join("\t", $FN_initid, $FN_interaction_id,
                                            #, $FN_alt_ids
                                               );
                                               
-my %ensembl_db_lookup = (
-			'ensembl'			=> 'multi',
-			'ensemblgenomes'	=> ['metazoa',
-			                        'bacteria',
-			                        'fungi',
-			                        'plants',
-			                        'protists'],
-            'pan_homology'    => 'pan_homology',
-            
-            'Acyrthosiphon'        => 'metazoa',
-            'Aedes'                => 'metazoa',
-            'Anopheles'            => 'metazoa',
-            'Apis'                 => 'metazoa',
-            'Caenorhabditis'       => 'metazoa',
-            'Culex'                => 'metazoa',
-            'Daphnia'              => 'metazoa',
-            'Drosophila'           => 'metazoa',
-            'Ixodes'               => 'metazoa',
-            'Nematostella'         => 'metazoa',
-            'Pediculus'            => 'metazoa',
-            'Pristionchus'         => 'metazoa',
-            'Schistosoma'          => 'metazoa',
-            'Pristionchus'         => 'metazoa',
-            'Strongylocentrotus'   => 'metazoa',
-            'Trichoplax'           => 'metazoa',
-            
-            'Arabidopsis'     => 'plants',
-            'Brachypodium'    => 'plants',
-            'Oryza'           => 'plants',
-            'Populus'         => 'plants',
-            'Sorghum'         => 'plants',
-            'Vitis'           => 'plants',
-            
-            'Plasmodium'      => 'protists',
-            'Thalassiosira'   => 'protists',
-            'Dictyostelium'   => 'protists',
-            'Phaeodactylum'   => 'protists',
-            
-            'Aspergillus'          => 'fungi',
-            'Fusarium'             => 'fungi',
-            'Gibberella'           => 'fungi',
-            'Nectria'              => 'fungi',
-            'Neosartorya'          => 'fungi',
-            'Neurospora '          => 'fungi',
-            'Puccinia'             => 'fungi',
-            'Saccharomyces'        => 'fungi',
-            'Schizosaccharomyces'  => 'fungi',
-            'Ustilago'             => 'fungi',
-            
-            'Bacillus'         => 'bacteria',
-            'Borrelia'         => 'bacteria',
-            'Buchnera'         => 'bacteria',
-            'Escherichia'      => 'bacteria',
-            'Shigella'         => 'bacteria',
-            'Mycobacterium'    => 'bacteria',
-            'Neisseria'        => 'bacteria',
-            'Pyrococcus'       => 'bacteria',
-            'Staphylococcus'   => 'bacteria',
-            'Streptococcus'    => 'bacteria',
-            'Wolbachia'        => 'bacteria'
-);
 #######################################################
 
 =head2 setup_ensembl_adaptor
@@ -587,14 +526,13 @@ my %ensembl_db_lookup = (
              a species-dependent adaptor out of it
  Returns   : An Ensembl Registry object if successful, undefined in all other cases
  Argument  : -connect_to_db: ensembl db to connect to. Choices currently are:
-                 a. 'multi' :  vertebrate compara (see http://www.ensembl.org/)
+                 a. 'ensembl' :  vertebrate compara (see http://www.ensembl.org/)
                  b. 'pan_homology' : pan taxonomic compara db, a selection of species from both 
                     Ensembl Compara and EnsemblGenomes Compara
                     (see http://nar.oxfordjournals.org/cgi/content/full/38/suppl_1/D563 )
-                 c. 'ensemblgenomes' : EnsemblGenomes compara db 
+                 c. 'metazoa' : Metazoan site from the EnsemblGenomes set of DBs 
                     (see http://metazoa.ensembl.org/index.html). 
-                 d. 'all'  : multi + ensemblgenomes.
-                 Default is 'multi'.
+                 d. 'all'  : ensembl + ensemblgenomes metazoa.
              -source_org: the initial species for the interolog walk. This MUST match with your 
               choice of db. Exception is raised if not
              -(OPTIONAL) dest_org: the destination species to use for the interolog walk. This 
@@ -650,7 +588,7 @@ sub setup_ensembl_adaptor{
                print "Aborting..\n";
                return;
           }
-     }elsif(($db eq 'ensemblgenomes')  ){
+     }elsif(($db eq 'metazoa')  ){ #ensemblgenomes metazoa
           $registry->load_registry_from_db(
                     -host          =>   'mysql.ebi.ac.uk',
                     -port          =>   4157,
@@ -659,9 +597,31 @@ sub setup_ensembl_adaptor{
                     );
           my @dba = @{ $registry ->get_all_DBAdaptors() };
           if(scalar(@dba) eq 0){# it should get in here if you have eg api v.59 and ensemblgenomes project is at v.58
-               print "\n\nsetup_ensembl_adaptor() - ERROR: no EnsemblGenomes Metazoa dbs available for connection.\n";
+               print "\n\nsetup_ensembl_adaptor() - ERROR: EnsemblGenomes Metazoa db  not available for connection.\n";
                print "Your installed API is version: V. $ENSEMBLVERSION.\n";
                print "This API might be too new for the current EnsemblGenomes Metazoa db release.\n";
+               print "Please install an earlier API version from metazoa.ensembl.org/info/docs/api/api_cvs.html\n";
+               print "Aborting..\n";
+               return;
+          }
+     }elsif( ($db eq 'fungi') || ($db eq 'protists') 
+             || ($db eq 'bacteria') || ($db eq 'plants')){
+          print "\n\n**ATTENTION: the Ensemlbgenomes site: --> $db <--\n";
+          print "is currently NOT SUPPORTED by Bio::Homology::InterologWalk.**\n";
+          print "This feature is currently for TESTING PURPOSES ONLY\n";
+          print "Proceed at your own risk and please report any bugs you will find.\n";
+          
+          $registry->load_registry_from_db(
+                    -host          =>   'mysql.ebi.ac.uk',
+                    -port          =>   4157,
+                    -user          =>   'anonymous',
+                    -verbose       =>   $verbose,
+                    );
+          my @dba = @{ $registry ->get_all_DBAdaptors() };
+          if(scalar(@dba) eq 0){# it should get in here if you have eg api v.59 and ensemblgenomes project is at v.58
+               print "\n\nsetup_ensembl_adaptor() - ERROR: no EnsemblGenomes dbs available for connection.\n";
+               print "Your installed API is version: V. $ENSEMBLVERSION.\n";
+               print "This API might be too new for the current EnsemblGenomes  dbs release.\n";
                print "Please install an earlier API version from metazoa.ensembl.org/info/docs/api/api_cvs.html\n";
                print "Aborting..\n";
                return;
@@ -841,14 +801,13 @@ sub remove_duplicate_rows{
  Returns   : success/error code
  Argument  : -registry object to connect to ensembl
              -ensembl db to connect to. Choices currently are:
-                 a. 'multi' :  vertebrate compara (see http://www.ensembl.org/)
+                 a. 'ensembl' :  vertebrate compara (see http://www.ensembl.org/)
                  b. 'pan_homology' : pan taxonomic compara db, a selection of species 
-                    from both Ensembl Compara and Ensembl Genomes 
+                    from both Ensembl and Ensembl Genomes 
                     (see http://nar.oxfordjournals.org/cgi/content/full/38/suppl_1/D563 )
-                 c. 'metazoa' : ensembl compara genomes, metazoa db 
+                 c. 'metazoa' : Ensemblgenomes, metazoan db 
                     (see http://metazoa.ensembl.org/index.html). 
-                 d. 'all'  : multi + metazoa.
-                 Default is 'multi'.
+                 d. 'all'  : ensembl + metazoa.
              -input_path : path to input file. Input file MUST be a text file with one entry
               per row, each entry containing an up-to-date gene ID recognised by the Ensembl 
               consortium (http://www.ensembl.org/) followed by a new line char.
@@ -903,16 +862,19 @@ sub get_forward_orthologies{
      
      #checks
      if(!$registry){
-          print("get_forward_orthologies(): no registry object found. Aborting..\n");
+          print "get_forward_orthologies(): no registry object found. Aborting..\n";
           return;
      }
      if(!$db){
-          printf("get_forward_orthologies(): no db class specified. Aborting..\n");
+          printf "get_forward_orthologies(): no db class specified. Aborting..\n";
           return;
      }
      if(!$sourceorg){
-          print("get_forward_orthologies(): no source organism specified. Aborting..\n");
+          print "get_forward_orthologies(): no source organism specified. Aborting..\n";
           return;
+     }
+     if($continue_walk){
+          print "\nget_forward_orthologies(): 'append_data' flag is ON.\n\n";
      }
      $destorg = 'all' if(!$destorg);
      $sourceorg = ucfirst(lc $sourceorg);
@@ -923,7 +885,8 @@ sub get_forward_orthologies{
      my $binomial_species = lc $sourceorg;
      $binomial_species =~ s/\s+/\_/;
      
-     #MANAGE FILES--------------
+     #MANAGE FILES---------------------------------------------------------------------
+     #---------------------------------------------------------------------------------
      open (my $in_data,  q{<}, $in_path) or croak("Unable to open $in_path : $!");
      my $out_data;
 
@@ -969,20 +932,21 @@ sub get_forward_orthologies{
           #set up header
           print $out_data $HEADER_FWD_ORTH, "\n";
      }
-     #-----------------------------
+     #-----------------------------------------------------------------------------------------
+     #-----------------------------------------------------------------------------------------
      
      my $sg = $sourceorg;
      $sg =~ s/(\w+)(\s+)(\S+)/$1/;
-     
+
      if($db eq 'all'){
-          push(@ensembl_dbs, $ensembl_db_lookup{ensembl});
-          push(@ensembl_dbs, $ensembl_db_lookup{$sg});
+          push(@ensembl_dbs, 'multi');
+          push(@ensembl_dbs, $db);
      }elsif($db eq 'ensembl'){
-          push(@ensembl_dbs, $ensembl_db_lookup{ensembl});
-     }elsif($db eq 'ensemblgenomes'){
-           push(@ensembl_dbs, $ensembl_db_lookup{$sg});
-     }else{ #'pan_homology'
-           push(@ensembl_dbs, $ensembl_db_lookup{pan_homology});
+          push(@ensembl_dbs, 'multi');
+     }elsif($db eq 'pan_homology'){
+           push(@ensembl_dbs, 'pan_homology');
+     }else{ #ensemblgenomes
+           push(@ensembl_dbs, $db);
      }
      
      my $source_species_gene_adaptor = $registry->get_adaptor($sourceorg, 'core', 'Gene');
@@ -1034,7 +998,7 @@ sub get_forward_orthologies{
 
           if($destorg eq "All"){#all species available
                my $num_of_genomes = @{$all_genome_dbs};
-               print("\n$num_of_genomes genomes considered in database: $ensembl_db. \n");
+               print("\n$num_of_genomes genomes found in database: $ensembl_db. \n\n");
           }else{    #one specific species selected
                my $dest_taxon = $NCBI_taxon_adaptor->fetch_node_by_name($destorg);
                my $dest_NCBI_taxon_ID = $dest_taxon->ncbi_taxid;
@@ -1045,7 +1009,7 @@ sub get_forward_orthologies{
                }
                my $method_link_species_set_adaptor = $registry->get_adaptor($ensembl_db, "compara", "MethodLinkSpeciesSet");
                my $gdb1; my $gdb2;
-
+               
                eval { local $SIG{'__DIE__'}; $gdb1 = $genome_db_adaptor->fetch_by_taxon_id($source_NCBI_taxon_ID); };    warn $@ if $@;
                eval { local $SIG{'__DIE__'}; $gdb2 = $genome_db_adaptor->fetch_by_taxon_id($dest_NCBI_taxon_ID);   };    warn $@ if $@;
 
@@ -1343,14 +1307,13 @@ sub get_interactions{
  Returns   : success/error
  Argument  : -registry: registry object for ensembl connection
              -ensembl db to connect to. Choices currently are:
-                 a. 'multi' :  vertebrate compara (see http://www.ensembl.org/)
+                 a. 'ensembl' :  vertebrate compara (see http://www.ensembl.org/)
                  b. 'pan_homology' : pan taxonomic compara db, a selection of species from 
                     both Ensembl Compara and Ensembl Genomes 
                     (see http://nar.oxfordjournals.org/cgi/content/full/38/suppl_1/D563 )
-                 c. 'metazoa' : ensembl compara genomes, metazoa db 
+                 c. 'metazoa' : Ensemblgenomes, metazoa db 
                     (see http://metazoa.ensembl.org/index.html). 
-                 d. 'all'  : multi + metazoa.
-                 Default is 'multi'.
+                 d. 'all'  : Ensembl Vertebrates + metazoa.
              -input_path : path to input file. Input file for this subroutine is the output 
               of get_interactions().
              -output_path : where you want the routine to write the data. Data is in TSV 
@@ -1439,16 +1402,16 @@ sub get_backward_orthologies{
      $sg =~ s/(\w+)(\s+)(\S+)/$1/;
      
      if($db eq 'all'){
-          push(@ensembl_dbs, $ensembl_db_lookup{ensembl});
-          push(@ensembl_dbs, $ensembl_db_lookup{$sg});
+          push(@ensembl_dbs, 'multi');
+          push(@ensembl_dbs, $db);
      }elsif($db eq 'ensembl'){
-          push(@ensembl_dbs, $ensembl_db_lookup{ensembl});
-     }elsif($db eq 'ensemblgenomes'){
-           push(@ensembl_dbs, $ensembl_db_lookup{$sg});
-     }else{ #'pan_homology'
-           push(@ensembl_dbs, $ensembl_db_lookup{pan_homology});
+          push(@ensembl_dbs, 'multi');
+     }elsif($db eq 'pan_homology'){
+           push(@ensembl_dbs, 'pan_homology');
+     }else{ #ensemblgenomes
+           push(@ensembl_dbs, $db);
      }
-
+     
      print $err_data $HEADER_FWD_ORTH, "\t", $HEADER_INT, "\n" if($err_path);
      print $out_data $HEADER_FWD_ORTH, "\t", $HEADER_INT, "\t", $HEADER_BWD_ORTH, "\n";
      #collect unique taxa and basic statistics from the input file===============
@@ -1541,9 +1504,8 @@ sub get_backward_orthologies{
                print("get_backward_orthologies: impossible to get a homology adaptor for DB: $ensembl_db\n");
                next;
           }
-          my $method_link_species_set_adaptor =
-               $registry->get_adaptor($ensembl_db, "compara", "MethodLinkSpeciesSet");
-          if(!$method_link_species_set_adaptor){
+          my $mlssa = $registry->get_adaptor($ensembl_db, "compara", "MethodLinkSpeciesSet");
+          if(!$mlssa){
                print("get_backward_orthologies: impossible to get a method link species set adaptor for DB: $ensembl_db\n");
                next;
           }
@@ -1560,6 +1522,9 @@ sub get_backward_orthologies{
                $NCBI_taxa_global{$NCBItaxonID} = 1;
                #If I obtained the data for this taxon from the previous db, I skip it
                
+               my $NCBI_parent_name; my $NCBI_parent_taxon_id;
+               my $candidate_NCBI_name; my $candidate_NCBI_id;
+               
                #query===========================
                my ($query) = "SELECT * 
                                    FROM int
@@ -1568,7 +1533,6 @@ sub get_backward_orthologies{
                                    OR ($FN_taxon_a='$NCBItaxonID' AND $FN_taxon_b = '-2')
                                    OR ($FN_taxon_b='$NCBItaxonID' AND $FN_taxon_a = '-1')
                                    OR ($FN_taxon_b='$NCBItaxonID' AND $FN_taxon_a = '-2')";
-               #my $query = "SELECT * FROM int WHERE ($FN_taxon_b='$NCBItaxonID')";
                #intact uses numerical codes instead of NCBI taxon ids sometimes. To my knowledge, these are -1 and -2
                #('in vitro' and 'chemical synthesis')
                $dbh = _setup_dbi_connection($in_path);
@@ -1582,36 +1546,63 @@ sub get_backward_orthologies{
                #SET UP SPECIES-DEPENDENT ENSEMBLE VARIABLES==============================
                my $NCBItaxon = $NCBI_taxon_adaptor->fetch_node_by_taxon_id($NCBItaxonID);
                next if (!$NCBItaxon);
+
                my $NCBItaxon_name = $NCBItaxon->binomial 
                                  || $NCBItaxon->common_name
                                  || $NCBItaxon->short_name
                                  || $NCBItaxon->ensembl_alias
                                  || '-';
+ 
                print "\n============\n";
                print "$NCBItaxon_name ($NCBItaxonID)\n";
-               print "============\n";
-               
+               print "============\n"; 
                my $gene_adaptor = $registry->get_adaptor($NCBItaxon_name, "core", "Gene");
-               if(!$gene_adaptor){
+               if(!$gene_adaptor){#TODO improve on this
                     my $binomial_name = lc $NCBItaxon_name;
                     $binomial_name =~ s/\s+/\_/;
                     $gene_adaptor = $registry->get_adaptor($binomial_name, "core", "Gene");
-                    if(!$gene_adaptor){
-                         print "gene_adaptor for $NCBItaxon_name not defined in Bio::EnsEMBL::Registry\n";
-                         next; 
+               }
+               
+               if($gene_adaptor){
+                    $candidate_NCBI_name = $NCBItaxon_name;
+                    $candidate_NCBI_id = $NCBItaxonID;
+               }else{#in this case I'll resort to climbing up the ontology 
+                    print "Gene_adaptor for $NCBItaxon_name impossible to retrieve.\n"; 
+                    print "Looking for parent NCBI ID..\n";
+                    $NCBI_parent_name = $NCBItaxon->parent->binomial;
+                    if(!$NCBI_parent_name){
+                         print "No parent name found for $NCBItaxon_name.\n";
+                         print "Aborting operation on this taxon..\n";
+                         next;
+                    }
+                    $NCBI_parent_taxon_id = $NCBItaxon->parent->ncbi_taxid;
+                    if(!$NCBI_parent_taxon_id){
+                         print "No parent taxon id found for $NCBItaxonID.\n";
+                         print "Aborting operation on this taxon..\n";
+                         next;
+                    }
+                    $gene_adaptor = $registry->get_adaptor($NCBI_parent_name, "core", "Gene");
+                    if($gene_adaptor){
+                         print "\n============\n";
+                         print "$NCBI_parent_name ($NCBI_parent_taxon_id)\n";
+                         print "============\n"; 
+                         $candidate_NCBI_name = $NCBI_parent_name;
+                         $candidate_NCBI_id = $NCBI_parent_taxon_id;
+                    }else{#If I can't get the g.a. from the parent's name I give up (to be impr upon)
+                         print "Gene_adaptor for $NCBI_parent_name impossible to retrieve.\n";
+                         print "Aborting operation on this taxon..\n";
+                         next;
                     }
                }
-               
-               if(!$genome_taxon_ids{$NCBItaxonID}){
-                    print "Genome name: $NCBItaxon_name ($NCBItaxonID) not recognised in ensembl db: $ensembl_db. Skipping this taxon..\n";
+
+               if(!$genome_taxon_ids{$candidate_NCBI_id}){
+                    print "Genome name: $candidate_NCBI_name ($candidate_NCBI_id) not recognised in ensembl db: $ensembl_db. Skipping this taxon..\n";
                     next;
                }
-
                my $gdb1;
-               eval { local $SIG{'__DIE__'}; $gdb1 = $genomedb_adaptor->fetch_by_taxon_id($NCBItaxonID); };  warn $@ if $@;
+               eval { local $SIG{'__DIE__'}; $gdb1 = $genomedb_adaptor->fetch_by_taxon_id($candidate_NCBI_id); };  warn $@ if $@;
                
-               my $orthologues_mlss = 
-               $method_link_species_set_adaptor->fetch_by_method_link_type_GenomeDBs("ENSEMBL_ORTHOLOGUES",[$gdb1,$gdb2]);
+               my $orthologues_mlss = $mlssa->fetch_by_method_link_type_GenomeDBs("ENSEMBL_ORTHOLOGUES",[$gdb1,$gdb2]);
                if(!$orthologues_mlss){
                     print "fetch_by_method_link_type_GenomeDBs for $gdb1, $gdb2 returns undefined\n";
                     next;
@@ -1638,19 +1629,19 @@ sub get_backward_orthologies{
                     my $DF_taxon_a         = $row->{$FN_taxon_a};
                     my $DF_taxon_b         = $row->{$FN_taxon_b};# this must be equal to $NCBItaxonID
                     
-                    $candidate = Bio::Homology::InterologWalk::_get_ensembl_id_from_mitab_data(
-                                                    init_id          => $DF_orthologue_id,
-                                                    acc_numb_a       => $DF_acc_numb_a,
-                                                    acc_numb_b       => $DF_acc_numb_b,
-                                                    alt_id_a         => $DF_alt_id_a,
-                                                    alt_id_b         => $DF_alt_id_b,
-                                                    name_a           => $DF_name_a,  
-                                                    name_b           => $DF_name_b,
-                                                    props_a          => $DF_props_a,
-                                                    props_b          => $DF_props_b,
-                                                    adaptor          => $gene_adaptor,
-                                                    id_check         => $check_ids                                                   
-                                                    );
+                    $candidate = _get_ensembl_id_from_mitab_data(
+                                     init_id          => $DF_orthologue_id,
+                                     acc_numb_a       => $DF_acc_numb_a,
+                                     acc_numb_b       => $DF_acc_numb_b,
+                                     alt_id_a         => $DF_alt_id_a,
+                                     alt_id_b         => $DF_alt_id_b,
+                                     name_a           => $DF_name_a,  
+                                     name_b           => $DF_name_b,
+                                     props_a          => $DF_props_a,
+                                     props_b          => $DF_props_b,
+                                     adaptor          => $gene_adaptor,
+                                     id_check         => $check_ids                                                   
+                                     );
                                                     
                     if($candidate){
                          $member = $member_adaptor->fetch_by_source_stable_id("ENSEMBLGENE", $candidate);
@@ -1787,6 +1778,9 @@ sub get_backward_orthologies{
      }
      return 1;
 }
+
+
+
 
 #
 #_fuzzy_match
@@ -4134,12 +4128,12 @@ sub compute_multiple_taxa_mean{
      my @taxa = (
           #"6239", #Cele #this has been removed from Ensembl Multi Compara. If you need this data you'll want to get a registry
           #through the multiple call.
-          "7227", #Dele
-          "9606", #Hsap
+          "7227",  #Dele
+          "9606",  #Hsap
           "10090", #Mmus
           "10116", #Rnor
-          "4932", # Scer
-          "7955", #Drer
+          "4932",  #Scer
+          "7955",  #Drer
      );
      my $NCBI_taxon_adaptor = $registry->get_adaptor("Multi", "compara", "NCBITaxon");
      

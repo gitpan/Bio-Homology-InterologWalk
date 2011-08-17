@@ -34,7 +34,7 @@ diag("Testing interfaces to remote services..Please be patient..\n\n");
 
 my %adaptor_options = (            
             'Ensembl_Vertebrates'    =>   ['ensembl'   , 'Mus musculus'           ],
-            'Ensembl_Genomes_Metazoa' =>  ['ensemblgenomes' , 'Caenorhabditis elegans' ],            
+            'Ensembl_Genomes_Metazoa' =>  ['metazoa' , 'Caenorhabditis elegans' ],            
             'Ensembl_Multiple'       =>   ['all'     , 'Drosophila melanogaster'],
 );
 
