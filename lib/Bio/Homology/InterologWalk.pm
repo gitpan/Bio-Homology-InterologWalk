@@ -22,7 +22,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
-our $VERSION = '0.52';
+our $VERSION = '0.55';
 
 
 #################### main pod documentation begins ###################
@@ -33,7 +33,7 @@ Bio::Homology::InterologWalk - Retrieve, prioritise and visualize putative Prote
 
 =head1 VERSION
 
-This document describes version 0.52 of Bio::Homology::InterologWalk released August 17th, 2011
+This document describes version 0.55 of Bio::Homology::InterologWalk released September 8th, 2011
 
 =head1 SYNOPSIS
 
@@ -1149,11 +1149,11 @@ sub get_interactions{
      my $physical_only   = $args{physical_only};
      
      if(!$in_path){
-          print("get_direct_interactions(): no PSICQUIC url specified. Aborting..\n");
+          print("get_interactions(): no PSICQUIC url specified. Aborting..\n");
           return;
      }
      if(!$url){
-          print("get_direct_interactions(): no PSICQUIC url specified. Aborting..\n");
+          print("get_interactions(): no PSICQUIC url specified. Aborting..\n");
           return;
      }
      
@@ -1823,7 +1823,8 @@ sub _fuzzy_match {
                                                                  check_ids       => 1,   
                                                                  no_spoke        => 1, 
                                                                  exp_only        => 1, 
-                                                                 physical_only   => 1
+                                                                 physical_only   => 1,
+                                                                 chimeric        => 1;
                                                                  );
  Purpose   : this methods allows  to query the Intact database using the REST interface. 
              IntAct is the Molecular Interaction database at the European Bioinformatics 
@@ -1874,6 +1875,9 @@ sub _fuzzy_match {
               if set, this flag only allows 
               physically associated PPIs to be retained and stored in the data file: 
               colocalizations and genetic interactions will be discarded.
+             -(OPTIONAL) chimeric: if set, PPI between source_org and other taxa will be
+              retrieved. DEFAULT: only PPIs where both interacting partners are in 
+              source_org are retrieved
  Throws    : -
  Comment   : -
 
@@ -1893,6 +1897,7 @@ sub get_direct_interactions{
      my $no_spokes       = $args{no_spoke};
      my $exp_only        = $args{exp_only};
      my $physical_only   = $args{physical_only};
+     my $wants_chimeras  = $args{chimeric};
      
      my $ID_OUT; #the object of our search
      
@@ -1908,7 +1913,6 @@ sub get_direct_interactions{
           print("get_direct_interactions(): no PSICQUIC url specified. Aborting..\n");
           return;
      }
-
      #MANAGE FILES
      open (my $in_data,  q{<}, $in_path) or croak("Unable to open $in_path : $!");
      open (my $out_data,  q{>}, $out_path) or croak("Unable to open $out_path : $!");
@@ -1953,17 +1957,17 @@ sub get_direct_interactions{
           chomp $ID;
           next if ($ID eq '');
           
-          my $idsignature;
+#          my $idsignature;
           #get a "signature" to spot the kind of id we are dealing with.
           #current solution involves getting all the letters starting from the beginning, if there's at least two.
           #otherwise get the initial three characters whatever they are, and then do a fuzzy regex matching using string::approx
           #this will be needed in order to be sure to get the same kind of id back.
           #eg "IPR006259" ----> "IPR"
-          if($ID =~ /^([a-z]{2,})(.+)/i){
-               $idsignature = $1;
-          }else{
-               $idsignature = substr($ID, 0, 1) . substr($ID, 1, 1) . substr($ID, 1, 1);
-          }
+#          if($ID =~ /^([a-z]{2,})(.+)/i){
+#               $idsignature = $1;
+#          }else{
+#               $idsignature = substr($ID, 0, 1) . substr($ID, 1, 1) . substr($ID, 1, 1);
+#          }
           
           print "$ID: Querying IntAct WS for $ID..";
           my $request = $url . $int_search_string.  $ID . $options;
@@ -1989,6 +1993,7 @@ sub get_direct_interactions{
           print "..Interactions found: ", $interactionsRetrieved, "\n";
           
           foreach my $intactInteraction (@responsetoparse){
+               my $same_taxon; my $ID_check;
                my @MITABDataRow = split("\t",$intactInteraction);
                
                #the following relies heavily on Intact's mitab implementation
@@ -1997,8 +2002,13 @@ sub get_direct_interactions{
                
                $DF_taxon_a    = _get_interactor_taxon($MITABDataRow[9]);
                $DF_taxon_b    = _get_interactor_taxon($MITABDataRow[10]);
-               next if($DF_taxon_a ne $DF_taxon_b);
-               
+               if($DF_taxon_a eq $DF_taxon_b){
+                    $same_taxon = 1;
+                    $ID_check = $check_ids;
+               }else{ #it's a chimeric interaction. In this case I continue only if specified by the user. If I continue,
+                      #the check id flag must be masked for the current interaction (if flagged) 
+                    next unless($wants_chimeras);
+               }
                $DF_acc_numb_a = _get_interactor_uniprot_id($MITABDataRow[0]);
                $DF_acc_numb_b = _get_interactor_uniprot_id($MITABDataRow[1]);
                $DF_alt_id_a   = _get_interactor_alias_prop_list($MITABDataRow[2]);
@@ -2023,7 +2033,7 @@ sub get_direct_interactions{
                                                     props_a          => $DF_props_a,
                                                     props_b          => $DF_props_b,
                                                     adaptor          => $gene_adaptor,
-                                                    id_check         => $check_ids                                                   
+                                                    id_check         => $ID_check                                                   
                                                     );
                #fuzzy string matching: this ID_OUT should be of the same kind as the original id. Does it feature the same initial
                #id signature or something very close?
@@ -2065,9 +2075,8 @@ sub get_direct_interactions{
                                                             props         => $DF_props_b
                                                             );
                
-                #RIVEDI QUA!!
-#               print("Converting all IDs in Uniprot KB IDs..\n");
-#                         
+                #TODO
+#               print("Converting all IDs in Uniprot KB IDs..\n");       
 #               my $candidate = Bio::Homology::InterologWalk::_compare_uniprotkbids($gene_adaptor, $ID, $DF_acc_numb_a, $DF_acc_numb_b);
 #               if($candidate){
 #                    print $candidate;  
@@ -2075,14 +2084,16 @@ sub get_direct_interactions{
 #                    $missed += 1;
 #                    next     
 #               }
-
-               #Last hope. Let's give up and save the name instead of the id.
-#               if(!$interactoridA){
-#                    $interactoridA = $DF_name_a if($DF_name_a ne '-');
-#               }
-#               if(!$interactoridB){
-#                    $interactoridB = $DF_name_b if($DF_name_b ne '-');
-#               }
+               #Let's give up and save the uniprotkb id instead of the ensembl id.
+               #this is useful when the destination taxon does not exist in ensembl but
+               #we still want to keep the interaction
+               if(!$interactoridA){
+                    $interactoridA = $DF_acc_numb_a if($DF_acc_numb_a ne '-');
+               }
+               if(!$interactoridB){
+                    $interactoridB = $DF_acc_numb_b if($DF_acc_numb_b ne '-');
+               }
+               
                unless($interactoridA and $interactoridB){
                     print("At least one of the two identifiers could not be retrieved. Skipping..\n");
                     $missed += 1;
@@ -2091,14 +2102,13 @@ sub get_direct_interactions{
 
                if($interactoridA eq $ID){
                     $ID_OUT = $interactoridB;
-               }elsif($ID eq $interactoridB){
+               }elsif($interactoridB eq $ID){
                     $ID_OUT = $interactoridA;
                }else{
                     print("\nWARNING id mismatch between $ID, $interactoridA, $interactoridB. Skipping..\n"); 
                     $missed += 1;
                     next;
                }
-
                print("Interaction ($DF_interaction_id): $ID <--> $ID_OUT\n");
                my $fullDataRow = join("\t",$ID,$DF_interaction_id,
                                              $DF_acc_numb_a, $DF_acc_numb_b,
@@ -2560,6 +2570,7 @@ sub _get_intact_id{
 sub _get_interactor_name{
      my ($nameString) = @_;
      my @namesVec;
+     
      #no name: exit
      if($nameString eq "-"){
           return $nameString;
@@ -2567,16 +2578,15 @@ sub _get_interactor_name{
      #multiple names:only get the first
      if($nameString =~ /\|+/){
           @namesVec = split(/\|/, $nameString);
-          $nameString = $namesVec[0]; #I IGNORE all but the first name when there are several
-          return $nameString;
+          $nameString = $namesVec[0];
      }
      
-     if($nameString =~ /^(uniprotkb):(.*)/){ 
+     if($nameString =~ /^(uniprotkb):(.*)(\(gene name\))/){
           return $2;
-     }else{
-          print "_get_interactor_name(): unrecognised entry format: '$nameString. Leaving as it is\n";
-          return $nameString;
+     }elsif($nameString =~ /^(uniprotkb):(.*)/){ 
+          return $2;
      }
+     return $nameString;
 }
 
 #
@@ -2723,6 +2733,8 @@ sub _get_vector_from_string{
 #
 #See Also   : 
 
+#the module enters here only if the interaction is not chimeric
+#ie the gene adaptor and the id should match
 sub _is_primary_id {
      my ($id_to_test, $gene_adaptor) = @_;
      my $candidateID;
@@ -2731,7 +2743,6 @@ sub _is_primary_id {
      return 1 if(defined $gene);
      
      my $genesArray = $gene_adaptor->fetch_all_by_external_name($id_to_test);
-          
      if(scalar(@$genesArray) == 1){
           return 1;
      }elsif(scalar(@$genesArray) == 0){
@@ -2765,17 +2776,22 @@ sub _is_primary_id {
 
 sub _get_ens_id_from_props{
      my ($prop_string) = @_;
+
+     my $count_ensembl = () = $prop_string =~ /ensembl/g;
+     my $count_cygd = () = $prop_string =~ /cygd/g;
+     my $count_flybase = () = $prop_string =~ /flybase/g;
      
      my @prop_vector = split(/\|/, $prop_string);
-     
      foreach my $item (@prop_vector){
           if($item =~ /^(ensembl):(.+)/){
-               return $2;
+             return $2 if($count_ensembl == 1);       
           #the next is for yeast. Intact stores id information in the properties, for yeast. However it gets it from cyg.
           #the is the same I'd get from ensembl (maybe more updated?) apart from the letters being lowercase. I turn it to full
           #uppercase for compatibility
           }elsif($item =~ /^(cygd):(.+)/){
-               return uc($2);
+               return uc($2) if($count_cygd == 1); 
+          }elsif($item =~ /(flybase):(FBgn\d+)(.*)/){
+               return $2 if($count_flybase == 1);
           }
      }
      return;
@@ -4814,12 +4830,12 @@ sub do_network{
 =head2 do_attributes
 
  Usage     : $RC  = Bio::Homology::InterologWalk::Networks::do_attributes(
-                                                     registry    => $registry,
-                                                     data_file   => $infilename,
-                                                     start_file  => $startfilename,
-                                                     data_dir    => $work_dir,
-                                                     source_org  => $sourceorg,
-                                                     label_type  => 'extname'
+                                                     registry       => $registry,
+                                                     data_file      => $infilename,
+                                                     start_file     => $startfilename,
+                                                     data_dir       => $work_dir,
+                                                     source_org     => $sourceorg,
+                                                     label_chimeric => 0
                                                      );
  Purpose   : This is needed to create two node attribute files to 
              go with the .sif network created by do_networks(). 
@@ -4829,7 +4845,7 @@ sub do_network{
                                       a human-readable gene name/description obtained from Ensembl.
              2nd node attribute file: The routine associates, for each stable id in the
                                       .sif file, a label indicating whether that id was present in
-                                      in the initial dataset or whether it is a novel discovery. 
+                                      the initial dataset or not. 
  Returns   : a boolean value for success/failure
  Argument  : -registry: ensembl registry object to connect to. Needed to retrieve up-to-date
               human readable gene names from Ensembl for the IDs in the input data file
@@ -4843,8 +4859,13 @@ sub do_network{
              -data_dir: where the routine should look for the input data and place the output
               data
              -source_org : source organism name (eg: "Mus musculus")
-             -(OPTIONAL) label_type: what kind of human readable string to employ. Options 
-              are 'extname' (external name) and 'description'. Default is 'extname'
+             -(OPTIONAL) label_chimeric: boolean flag. When set to 1, interactor IDs belonging to
+              species different from #source_org will be looked up against ensembl to retrieve
+              human readable names. Also, a short tag will be attached to all the gene names 
+              retrieved, to indicate the corresponding organism (eg _hsap).
+              Default is 0: chimeric gene IDs will be left as is in the name attribute file.
+              WARNING: setting this option to 1 will slow down the process considerably: use
+              only for small datasets.
  Throws    : -
  Comment   : -
 
@@ -4859,14 +4880,15 @@ sub do_attributes{
      my $start_data_file  = $args{start_file};#OPTIONAL
      my $data_dir         = $args{data_dir};
      my $sourceorg        = $args{source_org}; 
-     my $label_type       = $args{label_type};
+     my $tag_chimeras     = $args{label_chimeric};
      
      my %seen = ();
-     
+     my %start_data_set = ();
      my $SEEN = 'SEEN_IN_START_SET';
      my $NOVEL = 'NOVEL_PREDICTION';
-     
-     my %start_data_set = ();
+     my $gene_adaptor;
+     my $short_sourceorg;
+
      my $number_of_elements_start_ds;
      my $out_file_name; my $out_file_novel;
      my $in_path; my $start_data_path; my $out_path_name; my $out_path_novel;
@@ -4892,8 +4914,6 @@ sub do_attributes{
           print("do_attributes(): no source organism specified. Aborting..\n");
           return;
      }
-     $label_type = 'ext' if(!$label_type);
-     
      #MANAGE FILES=========
      $in_path = $data_dir . $in_file;
      $start_data_path = $data_dir . $start_data_file;
@@ -4921,7 +4941,8 @@ sub do_attributes{
      $number_of_elements_start_ds = keys %start_data_set;
      print "Number of unique ids in start dataset: $number_of_elements_start_ds\n" ;
      
-     my $gene_adaptor = $registry->get_adaptor($sourceorg, 'core', 'Gene');
+     $gene_adaptor = $registry->get_adaptor($sourceorg, 'core', 'Gene') unless($tag_chimeras);
+     
      print $out_data_name  "Ensembl_Name\n"; #node attribute: Ensembl name
      print $out_data_novel "Novel_id\n"; #node attribute: present in the original dataset or not?
      
@@ -4932,7 +4953,6 @@ sub do_attributes{
      while (my $row = $sth->fetchrow_hashref) {
           my $id_in = $row->{$FN_initid};
           my $id_out = $row->{$FN_interactor_id};
-          
           $seen{$id_in}  = 1;
           $seen{$id_out} = 1;
      }
@@ -4948,9 +4968,29 @@ sub do_attributes{
 		        $novelty = $NOVEL;
 	      }
 	      print $out_data_novel $stableid, "\t", "=", "\t", $novelty, "\n";
-          
+	      
+          if($stableid =~ /^EBI/){ #ebi ids are not recognised by ensembl, let's skip them immediately
+               print("do_attributes(): no gene object found for id: $stableid. Leaving as is.\n");
+               $label = $stableid;
+               print "$stableid\t=\t$label   ($novelty)\n";
+               print $out_data_name $stableid, "\t", "=", "\t", $label, "\n";
+               next;
+          }
+          #Dynamically change gene_adaptor depending on the ID species if required
+          if($tag_chimeras){
+               my ($org, $object_type, $db_type) = $registry->get_species_and_object_type($stableid);
+               if(!$org){
+                    my $org = $sourceorg;  
+               }else{
+                    my ($genus, $species) = split(/_/, $org);
+                    my $genus_sig = substr($genus, 0, 1);
+                    my $species_sig = substr($species, 0, 3);
+                    $short_sourceorg = join('',$genus_sig,$species_sig);
+               }
+               $gene_adaptor = $registry->get_adaptor($org, 'core', 'Gene');
+          } 
+         
           my $gene = $gene_adaptor->fetch_by_stable_id($stableid);
-          
           if(!$gene){
                $gene = $gene_adaptor->fetch_by_display_label($stableid);
                if(!$gene){
@@ -4958,7 +4998,7 @@ sub do_attributes{
                     if(scalar(@$genesArray) == 1){ 
                          $gene = @$genesArray[0];
                     }elsif(scalar(@$genesArray) > 1){
-                         print("do_attributes(): warning - $stableid has ambiguous gene object in Ensemlb. Choosing the first.\n");
+                         print("do_attributes(): warning - $stableid has ambiguous gene object in Ensembl. Choosing the first.\n");
                          $gene = @$genesArray[0];
                     }else{ #no gene object, leaving ID
                          print("do_attributes(): no gene object found for id: $stableid. Leaving as is.\n");
@@ -4970,33 +5010,9 @@ sub do_attributes{
                }
           }
           
-          if($label_type =~ /desc/){
-               $label = $gene->description;
-          }elsif($label_type =~ /ext/){
-               #$label = $gene->external_name || $gene->display_id;
-               #TODO TEMP ############### FLY ONLY
-               #
-               #
-               my @dblinks = @{ $gene->get_all_DBLinks("FlyBaseName_Gene%") };
-               if(scalar(@dblinks) == 1){
-                    my $flybasenamelink = $dblinks[0];
-                    $label = $flybasenamelink->display_id;
-               }elsif(scalar(@dblinks) == 0){
-                    print "do_attributes(): Error no dblink found\n";
-                    $label = $gene->external_name; 
-               }else{
-                    print "do_attributes():More than one dblink found\n";
-                    $label = $gene->external_name; 
-               }
-               #
-               # TODO TEMP
-               #
-               #
-          }else{
-               print("do_attributes(): label type unrecognised: $label_type. Aborting..\n");
-               return;
-          }
+          $label = $gene->external_name || $gene->display_id;
           $label = $stableid if(!$label);
+          $label = $label . '_' . $short_sourceorg if($tag_chimeras);
           print "$stableid\t=\t$label   ($novelty)\n";
           print $out_data_name $stableid, "\t", "=", "\t", $label, "\n";
      }

@@ -1,5 +1,19 @@
 Revision history for Perl extension Bio::Homology::InterologWalk.
 
+0.55	Thu Sep 8 15:06:45 2011
+	interface changes:
+        - get_direct_interactions(): introduced flag to allow for retrieval of chimeric (taxonA != taxonB)
+          PPIs if desired
+        - do_attributes(): removed label_type flag. Now only "external name" can be used to populate
+          name attribute file
+        - do_attributes(): introduced 'label_chimeric' to comply with changes in get_direct_interactions().
+          Introduced dynamic retrieval of gene_adaptor to find chimeric species and label gene names by
+          species name
+        bugfixes:
+        - _get_interactor_name(): fixed (gene name) problem due to intact change
+        - _get_ens_id_from_props(): included 'flybase' case due to intact change in properties field
+        - _get_ens_id_from_props(): introduced ensembl ID count: if only 1, accepted, if more, ambiguous case.
+
 0.52    Wed Aug 17 12:09:02 2011
         - removed hard-coded species hash
         - updated interface and documentation

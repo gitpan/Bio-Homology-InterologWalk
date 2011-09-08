@@ -74,10 +74,10 @@ my $RC1 = Bio::Homology::InterologWalk::get_direct_interactions(
                                               output_path         => $out_path,
                                               url                 => $url,
                                               check_ids           => 1,     
-                                              #the following are used to build a more complex query and filter out low quality interactions
-                                              #no_spoke            => 1, #
-                                              exp_only            => 1, #
-                                              physical_only       => 1, #
+                                              #no_spoke            => 1,
+                                              exp_only            => 1,
+                                              physical_only       => 1,
+                                              #chimeric            => 1
                                               );                                                          
 if(!$RC1){
      print "There were errors. Stopping..\n";

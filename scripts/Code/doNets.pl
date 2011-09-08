@@ -99,12 +99,15 @@ print colored ( "Creating attribute file for sif network...", 'green' ), "\n";
 $start_run = time();
 
 my $RC2  = Bio::Homology::InterologWalk::Networks::do_attributes(
-                                                       registry    => $registry,
-                                                       data_file   => $infilename,
-                                                       start_file  => $startfilename,
-                                                       data_dir    => $work_dir,
-                                                       source_org  => $sourceorg,
-                                                       #label_type    => 'descr' #options are 'extname' / 'description'
+                                                       registry        => $registry,
+                                                       data_file       => $infilename,
+                                                       start_file      => $startfilename,
+                                                       data_dir        => $work_dir,
+                                                       source_org      => $sourceorg,
+                                                       #set the following to 1 ONLY if you are processing
+                                                       #direct interactions including chimeric IDs
+                                                       #as it will SLOW down the routine considerably
+                                                       #label_chimeric  => 1 
                                                        );
 if ( !$RC2 ) {
     print("There were errors. Stopping..\n");
