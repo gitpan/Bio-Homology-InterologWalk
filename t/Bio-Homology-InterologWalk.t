@@ -24,7 +24,7 @@ diag("remote services provided by Ensembl and Intact MUST BE ACTIVE.\n");
 diag("in case of multiple test failure,\n");
 diag("please check status of Ensembl services on announce\@ensembl.org\n");
 diag("and status of EBI Intact PSICQUIC service on\n");
-diag("ebi.ac.uk/Tools/webservices/psicquic/registry/registry?action=STATUS\n");
+diag("www.ebi.ac.uk/Tools/webservices/psicquic/registry/registry?action=STATUS\n");
 diag("########################\n");
 diag("########################\n\n");
 

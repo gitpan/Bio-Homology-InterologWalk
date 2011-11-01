@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Bio-Homology-InterologWalk
-version:            0.55
+version:            0.57
 abstract:           Retrieve, prioritise and visualize putative Protein-Protein Interactions through interolog mapping
 author:
     - Giuseppe Gallone <ggallone@cpan.org>

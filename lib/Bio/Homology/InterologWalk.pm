@@ -4,13 +4,11 @@ use 5.008006;
 use strict;
 use warnings;
 
-use String::Approx 'amatch';
-use Carp qw(croak);
-
 use Bio::EnsEMBL::Registry;
 use REST::Client;
 use GO::Parser;
 use DBI;
+use String::Approx 'amatch';
 use Carp qw(croak);
 
 require Exporter;
@@ -22,7 +20,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
-our $VERSION = '0.55';
+our $VERSION = '0.57';
 
 
 #################### main pod documentation begins ###################
@@ -33,13 +31,13 @@ Bio::Homology::InterologWalk - Retrieve, prioritise and visualize putative Prote
 
 =head1 VERSION
 
-This document describes version 0.55 of Bio::Homology::InterologWalk released September 8th, 2011
+This document describes version 0.57 of Bio::Homology::InterologWalk released November 1st, 2011
 
 =head1 SYNOPSIS
 
   use Bio::Homology::InterologWalk;
 
-First, obtain Intact Interactions for the dataset (see example in C<getDirectInteractions.pl>):
+First, obtain known interactions for the dataset from EBI Intact (see example in C<getDirectInteractions.pl>):
 
 
   #get a registry from Ensembl
@@ -62,7 +60,7 @@ First, obtain Intact Interactions for the dataset (see example in C<getDirectInt
 
 
 
-do some postprocessing (see L</do_counts> and L</extract_unseen_ids> ) and then run the actual interolog walk on the dataset
+do some postprocessing if required (see L</do_counts> and L</extract_unseen_ids> ) and then run the actual interolog walk on the dataset
 with the following sequence of three methods.
 
 
@@ -239,7 +237,7 @@ Compute a prioritisation index to rank each binary putative interaction on the b
 
 Extract the binary putative PPIs from the dataset and save them in a format compatible with Cytoscape. This helps providing a visual quality to the result as 
 one could then apply network analysis tools to discover motifs, clusters, well-connected subnetworks, look for GO functional enrichment, and more. 
-The format chosen for the network representation of the dataset is currently C<.sif>. (see http://cytoscape.wodaklab.org/wiki/Cytoscape_User_Manual#Supported_Network_File_Formats) 
+The format chosen for the network representation of the dataset is currently C<.sif> (see http://cytoscape.wodaklab.org/wiki/Cytoscape_User_Manual#Supported_Network_File_Formats) 
 The generation of node attributes is also possible, to allow for visualisation of node tags in terms of (a) simpler human readable labels instead of database IDs and
 (b) presence/absence of the node in the initial dataset.
 
@@ -280,18 +278,16 @@ Score the dataset obtained in (2.) using the dataset obtained in (1.) to normali
 =item 4. B<Extract network and attributes for the two PPI datasets.>
 
 For each of the two datasets obtained from (1) and (2) (putative PPIs) or from (1) and (3) (scored putative PPIs) extract a text file containing a network representation and 
-two text files of node attributes. 
-
-See example in C<doNets.pl>
+two text files of node attributes. See example in C<doNets.pl>
 
 =back
 
 
 =head1 DEPENDENCIES 
 
-C<Bio::Homology::InterologWalk> relies on the following prerequisite packages.
+C<Bio::Homology::InterologWalk> relies on the following prerequisite software:
 
-=head2 Ensembl API
+=head2 1. Ensembl API
 
 The Ensembl project is currently branched in two sub-projects:
 
@@ -306,34 +302,12 @@ See http://www.ensembl.org/index.html for further details.
 
 This utilises the Ensembl software infrastructure (originally developed in the Ensembl Core project) to provide 
 access to genome-scale data from non-vertebrate species. This is of interest to you if your species  is a non-vertebrate, or if
-your species  is a vertebrate but you I<also want to obtain results mapped from non-vertebrates>. C<Bio::Homology::InterologWalk> currently only supports
-the B<metazoa> sub-site from the Ensembl Genomes Project. See http://metazoa.ensembl.org/index.html for further details.
+your species  is a vertebrate but you I<also want to obtain results mapped from non-vertebrates>. C<Bio::Homology::InterologWalk> at the moment officially supports
+the B<metazoa> sub-site from the Ensembl Genomes Project (note that fungi, plants, protists might work however functionality has not been tested thoroughly). See http://metazoa.ensembl.org/index.html for further details.
 
 =back 
 
-
-
-B<IMPORTANT> You will need to decide which Ensembl-DB set you will need B<prior> to installing C<Bio::Homology::InterologWalk>.  
-The module requests that 
-
-Ensembl API Version == Ensembl-DB set version. 
-
-This means that if you install e.g. API V.63, 
-you will only be able to get data from Ensembl Vertebrates / Metazoa databases V. 63. As the EnsemblGenomes DB releases are 
-B<one version behind> the Ensembl Vertebrate DB release, if you install the bleeding-edge Ensembl Vertebrate API, I<a matching EnsemblGenomes DB release might
-not be available yet>: you will still be able to use C<Bio::Homology::InterologWalk> to run an orthology walk using exclusively Ensembl Vertebrate DBs, but you
-will get an error if you try to choose metazoan databases. See L</setup_ensembl_adaptor> for further information.
-
-
-Therefore, before installing C<Bio::Homology::InterologWalk>, you are faced with the following choice: 
-
-=over
-
-=item a)
-
-If you are exclusively interested in B<vertebrates> (plus the few
-non-vertebrate model organisms still present in Ensembl Vertebrates) then obtain the APIs and
-set up the environment by following the steps described on the Ensembl Vertebrates API installation pages:
+Please obtain the APIs and set up the environment by following the steps described on the Ensembl Vertebrates API installation pages:
 
 http://www.ensembl.org/info/docs/api/api_installation.html
 
@@ -341,13 +315,10 @@ or alternatively
 
 http://www.ensembl.org/info/docs/api/api_cvs.html
 
-This option allows you to get the B<most recent> datasets provided by Ensembl Core. However, you might not be able to query EnsemblCompara data.
-
-=item b) 
-
-If you are interested in querying/getting back data from vertebrate + metazoan genomes, then obtain the APIs
-and set up the environment by following the steps described on the Ensembl Metazoa API installation pages: 
-(this allows you to query across a wider selection of taxa)
+B<NOTE 1 - > The Ensembl Vertebrate and Ensembl Genomes DB releases are usually not synchronised: an Ensembl Genomes DB release usually follows the corresponding Ensembl Vertebrates
+release by a number of weeks. This means that if you install a bleeding-edge Ensembl Vertebrate API, while the corresponding Ensembl Vertebrate DB will exist, I<a matching EnsemblGenomes DB release might
+not be available yet>: you will still be able to use C<Bio::Homology::InterologWalk> to run an orthology walk using exclusively Ensembl Vertebrate DBs, but you
+will get an error if you try to choose an Ensembl Genomes databases. In such cases, please install the most recent API compatible with Ensembl Genomes Metazoa, from
 
 http://metazoa.ensembl.org/info/docs/api/api_installation.html
 
@@ -355,23 +326,21 @@ or alternatively
 
 http://metazoa.ensembl.org/info/docs/api/api_cvs.html
 
-This option will probably not use the most recent API+DBs, but will guarantee functionality across both Vertebrate and Metazoan genomes.
+This option will not always use the most recent data, but will guarantee functionality across both Vertebrate and Metazoan genomes.
 
 =back
 
-Option (b) is the B<recommended> one.
+B<NOTE 2 - >: All the API components  (C<ensembl>, C<ensembl-compara>, C<ensembl-variation>, C<ensembl-functgenomics>) must be installed.
 
-NOTE 1: All the API components  (C<ensembl>, C<ensembl-compara>, C<ensembl-variation>, C<ensembl-functgenomics>) are required.
+B<NOTE 3 - >: The module has been tested on Ensembl Vertebrates API & DB v. 59-64 and EnsemblGenomes API & DB  v. 6-10.
 
-NOTE 2: The module has been tested on Ensembl Vertebrates API & DB v. 58-63 and EnsemblGenomes API & DB  v. 5-10.
-
-=head2 Bioperl
+=head2 2. Bioperl
 
 Ensembl provides a customised Bioperl installation tailored to its API, v. 1.2.3. 
 Should version 1.2.3 be no more available through Ensembl, please obtain release 1.6.x from CPAN. (while not officially supported by the
 Ensembl Project it will work fine when using the API within the scope of the present module)
 
-=head2 Additional Perl Modules
+=head2 3. Additional Perl Modules
 
 The following modules (including all dependencies) from CPAN are also required:
 
@@ -681,6 +650,7 @@ sub setup_ensembl_adaptor{
                return;
           }
      }
+    $registry->set_reconnect_when_lost() if($ENSEMBLVERSION > 63); #TODO TESTING
     return $registry;
 }
 
@@ -4666,7 +4636,7 @@ sub do_network{
           
           if($expand_taxa){ #IPX, taxon info
               print("Expanding binary interactions through taxon information..\n\n");
-              if($ortology_class eq "onetoone"){
+              if($ortology_class eq "onetoone"){ 
                    $query = "SELECT $FN_initid,$FN_interactor_id,$FN_prioritisation_index, $FN_taxon_a
                              FROM int
                              WHERE ($FN_odesc_1 like '%one2one%') 
@@ -4767,7 +4737,7 @@ sub do_network{
      #
      $sth = $dbh->prepare($query);
      $sth->execute() or die "Cannot execute: " . $sth->errstr();
-     #TCHECK FOR the case of NO entries (eg no one to one orthologies)
+     #CHECK FOR the case of NO entries (eg no one to one orthologies)
      
      #ensembl adaptors---------- 
      my $source_gene_adaptor = $registry->get_adaptor($sourceorg, 'core', 'Gene');
@@ -5046,9 +5016,11 @@ http://www.ebi.ac.uk/Tools/webservices/psicquic/registry/registry?action=STATUS
 
 =head1 AUTHOR
 
-Giuseppe Gallone  E<lt>ggallone@cpan.orgE<gt>
+Giuseppe Gallone  E<lt>ggallone AT cpan DOT orgE<gt>
 
 CPAN ID: GGALLONE
+
+http://homepages.inf.ed.ac.uk/s0789227/
 
 University of Edinburgh
 

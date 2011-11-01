@@ -1,5 +1,10 @@
 Revision history for Perl extension Bio::Homology::InterologWalk.
 
+0.57	Tue Nov 1 14:41:07 2011
+	-improved documentation
+        -setup_ensembl_adaptor(): added support for set_reconnect_when_lost() - introduced in API v64
+
+
 0.55	Thu Sep 8 15:06:45 2011
 	interface changes:
         - get_direct_interactions(): introduced flag to allow for retrieval of chimeric (taxonA != taxonB)
