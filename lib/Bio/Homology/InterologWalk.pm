@@ -20,7 +20,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
-our $VERSION = '0.57';
+our $VERSION = '0.58';
 
 
 #################### main pod documentation begins ###################
@@ -31,7 +31,7 @@ Bio::Homology::InterologWalk - Retrieve, prioritise and visualize putative Prote
 
 =head1 VERSION
 
-This document describes version 0.57 of Bio::Homology::InterologWalk released November 1st, 2011
+This document describes version 0.58 of Bio::Homology::InterologWalk released February 1st, 2012
 
 =head1 SYNOPSIS
 
@@ -910,7 +910,7 @@ sub get_forward_orthologies{
 
      if($db eq 'all'){
           push(@ensembl_dbs, 'multi');
-          push(@ensembl_dbs, $db);
+          push(@ensembl_dbs, 'metazoa');
      }elsif($db eq 'ensembl'){
           push(@ensembl_dbs, 'multi');
      }elsif($db eq 'pan_homology'){
@@ -1373,7 +1373,7 @@ sub get_backward_orthologies{
      
      if($db eq 'all'){
           push(@ensembl_dbs, 'multi');
-          push(@ensembl_dbs, $db);
+          push(@ensembl_dbs, 'metazoa');
      }elsif($db eq 'ensembl'){
           push(@ensembl_dbs, 'multi');
      }elsif($db eq 'pan_homology'){
