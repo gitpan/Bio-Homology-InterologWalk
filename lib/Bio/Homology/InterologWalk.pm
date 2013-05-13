@@ -20,7 +20,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
-our $VERSION = '0.58';
+our $VERSION = '0.6b';
 
 
 #################### main pod documentation begins ###################
@@ -31,7 +31,7 @@ Bio::Homology::InterologWalk - Retrieve, prioritise and visualize putative Prote
 
 =head1 VERSION
 
-This document describes version 0.58 of Bio::Homology::InterologWalk released February 1st, 2012
+This document describes version 0.6b of Bio::Homology::InterologWalk released May 8th, 2013
 
 =head1 SYNOPSIS
 
@@ -616,7 +616,7 @@ sub setup_ensembl_adaptor{
           #I can retrieve one significant dbadaptor per connection (multi/metazoa) using a species which I know
           #must be in there (human / worm)
           my $dba_multi = $registry->get_DBAdaptor("Homo sapiens", "core");
-          my $dba_genomes = $registry->get_DBAdaptor("Anopheles gambiae", "core");
+          my $dba_genomes = $registry->get_DBAdaptor("Anolis carolinensis", "core");
           unless($dba_multi && $dba_genomes){
                print "\n\nsetup_ensembl_adaptor() - ERROR: some databases are not available for connection:\n";
                print "Your installed API is version: V. $ENSEMBLVERSION.\n";
@@ -638,13 +638,14 @@ sub setup_ensembl_adaptor{
      }
      
      #We have to check the species chosen by the user against his choice of dbs..
-     if(!($registry->get_adaptor($sourceorg, "core", "Gene"))){
+     #Ensembl 65 change
+     if(!$registry->alias_exists($sourceorg)){
           print("setup_ensembl_adaptor(): The selected source organism ($sourceorg) is not available in the selected Ensembl Compara DB ( $db ).\n");
           print("*Please make sure you choose a meaningful combination of species and db.* Aborting..\n");
           return;
      }
      unless($destorg eq 'all'){ #all will mean "all the species included in the selected db"
-          if(!($registry->get_adaptor($destorg, 'core', 'Gene'))){
+          if(!$registry->alias_exists($destorg)){
                print("setup_ensembl_adaptor(): The selected destination organism ($destorg) is not available in the selected Ensembl Compara DB ( $db ).\n");
                print("*Please make sure you choose a meaningful combination of species and db. Aborting..\n");
                return;
@@ -919,13 +920,17 @@ sub get_forward_orthologies{
            push(@ensembl_dbs, $db);
      }
      
-     my $source_species_gene_adaptor = $registry->get_adaptor($sourceorg, 'core', 'Gene');
-     #some control on the source organism name
-     if(!$source_species_gene_adaptor){
+     #todo new Ensembl 65--------
+     #if it's not backwards compatible, use other solution
+     my $source_species_gene_adaptor;
+     if($registry->alias_exists($sourceorg)) {
+          $source_species_gene_adaptor = $registry->get_adaptor($sourceorg, 'core', 'Gene');
+     }else{
           print("get_forward_orthologies(): source organism string: $sourceorg not recognised by Ensembl. Please double check. Aborting..\n");
           return;
      }
-     
+     #----------------------------
+ 
      foreach my $ensembl_db (@ensembl_dbs){
           my $orthologues_mlss;
           my %genome_taxon_ids;
@@ -933,7 +938,7 @@ sub get_forward_orthologies{
           $counter_db = 0;
           
           print("\n----Querying Ensembl Compara ($ensembl_db) for orthologues----\n");
-          my $genome_db_adaptor = $registry->get_adaptor($ensembl_db,   'compara', 'GenomeDB');
+          my $genome_db_adaptor = $registry->get_adaptor($ensembl_db, 'compara', 'GenomeDB');
           #We need to verify that the genome exists in the db
           my $all_genome_dbs = $genome_db_adaptor->fetch_all();
           foreach my $genome (@{$all_genome_dbs}){
@@ -991,12 +996,13 @@ sub get_forward_orthologies{
           }
           
           while (<$in_data>){
-               my ($ID) = $_;
-               chomp $ID;
+               my $ID = $_;
+               chomp($ID);
                next if ($ID eq '');
                
                $counter = 0;
-               my $gene;my @genes;
+               my $gene = '';
+               my @genes = ();
                
                #stable id and display label
                $gene = $source_species_gene_adaptor->fetch_by_stable_id($ID);
@@ -1010,10 +1016,13 @@ sub get_forward_orthologies{
                }
 
                foreach my $gene (@genes){
-                    my $all_homologies;
-                    my $gid = $gene->stable_id;
-                    my $member = $member_adaptor->fetch_by_source_stable_id("ENSEMBLGENE", $gid);
-               
+                    my $all_homologies = ();
+                    my $gid = '';
+                    my $member = '';
+                    
+                    $gid = $gene->stable_id;
+                    $member = $member_adaptor->fetch_by_source_stable_id("ENSEMBLGENE", $gid);
+
                     if (defined $member){
                          if($destorg eq "All"){ #all destination genomes
                               $all_homologies = $homology_adaptor->fetch_all_by_Member($member);
@@ -1132,10 +1141,9 @@ sub get_interactions{
      open (my $out_data,  q{>}, $out_path) or croak("Unable to open $out_path : $!");
      #============
      
-     #interactor search string
-     my $int_search_string = "search/interactor/";
-     #GLOBAL search string
-     my $glob_search_string = "search/query/";
+     #search string
+     my $glob_search_string = 'search/query/identifier:';
+     my $glob_search_xref = ' OR pxref:';
 
      my $atleast_one_entry;
      my $totalSpokes = 0;
@@ -1184,24 +1192,14 @@ sub get_interactions{
           print "$ID: Querying IntAct WS for $orthologueID..";
      
           my $queryTerm = $orthologueID;
-          my $request = $url . $int_search_string . $queryTerm . $options ;
+          my $request = $url . $glob_search_string . $queryTerm . $glob_search_xref . $queryTerm . $options;
      
           $client->GET($request);
           print "(", $client->responseCode(), ")";
-  
           my $responseContent = $client->responseContent();
           if(!$responseContent){
-               #Let's try
-               #a global search, to search for the id in non-standard data fields:
-               $request = $url . $glob_search_string . $queryTerm . $options;
-               $client->GET($request);
-               
-               #print "(", $client->responseCode(), ")";
-               $responseContent = $client->responseContent();
-               if(!$responseContent){
-                    print("..nothing..\n");
-                    next;
-               }
+               print("..nothing..\n");
+               next;
           }
           $atleast_one_entry = 1;
           my @responsetoparse = split(/\n/,$responseContent);
@@ -1211,25 +1209,25 @@ sub get_interactions{
           foreach my $intactInteraction (@responsetoparse){
                my @MITABDataRow = split("\t",$intactInteraction);
                
-               #Field values rely on MITAB specification: if it changes, this won't work anymore
                $DF_interaction_id  = _get_intact_id($MITABDataRow[13]);
                next if(!$DF_interaction_id);
-               $DF_acc_numb_a      = _get_interactor_uniprot_id($MITABDataRow[0]);
-               $DF_acc_numb_b      = _get_interactor_uniprot_id($MITABDataRow[1]);
-               $DF_alt_id_a        = _get_interactor_alias_prop_list($MITABDataRow[2]);
-               $DF_alt_id_b        = _get_interactor_alias_prop_list($MITABDataRow[3]);
-               $DF_name_a          = _get_interactor_name($MITABDataRow[4]);
-               $DF_name_b          = _get_interactor_name($MITABDataRow[5]);
-               
-               $DF_props_a         = _get_interactor_alias_prop_list($MITABDataRow[19]);
-               $DF_props_b         = _get_interactor_alias_prop_list($MITABDataRow[20]);
-               
+               $DF_acc_numb_a = _get_interactor_uniprot_id($MITABDataRow[0]);
+               $DF_acc_numb_b = _get_interactor_uniprot_id($MITABDataRow[1]);
+               $DF_alt_id_a   = _get_interactor_alias_prop_list($MITABDataRow[2]);
+               $DF_alt_id_b   = _get_interactor_alias_prop_list($MITABDataRow[3]);
+               $DF_name_a     = _get_interactor_name($MITABDataRow[4]);
+               $DF_name_b     = _get_interactor_name($MITABDataRow[5]);
+               #$DF_props_a    = _get_interactor_alias_prop_list($MITABDataRow[19]);
+               #$DF_props_b    = _get_interactor_alias_prop_list($MITABDataRow[20]);
+               $DF_props_a    = '-'; #don't exist anymore as of 21/02/2013
+               $DF_props_b    = '-'; #don't exist anymore as of 21/03/2012
                $DF_taxon_a         = _get_interactor_taxon($MITABDataRow[9]);
                $DF_taxon_b         = _get_interactor_taxon($MITABDataRow[10]);
-               $DF_pub             = $MITABDataRow[8];
-               $DF_int_type        = $MITABDataRow[11];
-               $DF_det_method      = $MITABDataRow[6];
-               $DF_exp_method      = $MITABDataRow[24];
+               $DF_pub        = $MITABDataRow[8];
+               $DF_int_type   = $MITABDataRow[11];
+               $DF_det_method = $MITABDataRow[6];
+               #$DF_exp_method = $MITABDataRow[24];
+               $DF_exp_method = 'NA';#doesn't exist anymore
           
                print("Interaction ($DF_interaction_id): $DF_acc_numb_a <-> $DF_acc_numb_b\n");
           
@@ -1360,7 +1358,6 @@ sub get_backward_orthologies{
      $ENSEMBLIDFAILED = undef; 
      my $failedcounter = 0;
      my $global_count = 0;
-     my $orthology_count = 0;
      my @ensembl_dbs;
      
      my @NCBItaxa = ();  
@@ -1411,6 +1408,8 @@ sub get_backward_orthologies{
      print "Total Number of Unique NCBI taxa IDs: $unique_taxa.\n";
      $sth->finish;
      $dbh->disconnect;
+     undef $sth;
+     undef $dbh;
      #=============================================================================
      foreach my $ensembl_db (@ensembl_dbs){
           my %genome_taxon_ids;
@@ -1437,7 +1436,6 @@ sub get_backward_orthologies{
                $genome_taxon_ids{$genome->taxon_id} = 1;
                $genome_names{$genome->name} = 1;  
           }
-          
           foreach my $genome (@{$all_genome_dbs}){
                if( ( $genome->taxon_id eq $source_NCBI_taxon_ID ) or ($genome->name eq $binomial_species) ){
                     $gdb2 = $genome;
@@ -1489,6 +1487,8 @@ sub get_backward_orthologies{
                     
           foreach my $NCBItaxonID (@NCBItaxa){
                next if($NCBI_taxa_global{$NCBItaxonID});
+               next if($NCBItaxonID eq $source_NCBI_taxon_ID);
+               
                $NCBI_taxa_global{$NCBItaxonID} = 1;
                #If I obtained the data for this taxon from the previous db, I skip it
                
@@ -1505,9 +1505,9 @@ sub get_backward_orthologies{
                                    OR ($FN_taxon_b='$NCBItaxonID' AND $FN_taxon_a = '-2')";
                #intact uses numerical codes instead of NCBI taxon ids sometimes. To my knowledge, these are -1 and -2
                #('in vitro' and 'chemical synthesis')
-               $dbh = _setup_dbi_connection($in_path);
-               my $sthHash = $dbh->prepare($query);
-               my $sthVec = $dbh->prepare($query);
+               my $dbh_taxon = _setup_dbi_connection($in_path);
+               my $sthHash = $dbh_taxon->prepare($query);
+               my $sthVec = $dbh_taxon->prepare($query);
                $sthHash->execute() or die "Cannot execute: " . $sthHash->errstr();
                $sthVec->execute() or die "Cannot execute: " . $sthVec->errstr();
                #===========================================================
@@ -1526,18 +1526,34 @@ sub get_backward_orthologies{
                print "\n============\n";
                print "$NCBItaxon_name ($NCBItaxonID)\n";
                print "============\n"; 
-               my $gene_adaptor = $registry->get_adaptor($NCBItaxon_name, "core", "Gene");
-               if(!$gene_adaptor){#TODO improve on this
-                    my $binomial_name = lc $NCBItaxon_name;
-                    $binomial_name =~ s/\s+/\_/;
-                    $gene_adaptor = $registry->get_adaptor($binomial_name, "core", "Gene");
-               }
+               #TODO V.65: if the species name is not present in the db, the next call will fail with an exception.
+               #I can try to search the species name in the genome names vector.
+               #that's risky though..ensemblgenomes taxa names can be complicated. I'm not sure if they stick
+               #to the naming convention [genus_species] all the time.
+               #solution Andy Yates 20/1/2012 mailing list 
                
-               if($gene_adaptor){
-                    $candidate_NCBI_name = $NCBItaxon_name;
-                    $candidate_NCBI_id = $NCBItaxonID;
-               }else{#in this case I'll resort to climbing up the ontology 
-                    print "Gene_adaptor for $NCBItaxon_name impossible to retrieve.\n"; 
+               
+               my $gene_adaptor;
+               my $gdb1;
+               if($registry->alias_exists($NCBItaxon_name)){
+                    $gene_adaptor = $registry->get_adaptor($NCBItaxon_name, "core", "Gene");
+                    if(!$gene_adaptor){#TODO there might be problems in recognising a taxon name that, in fact, is there:
+                         my $binomial_name = lc $NCBItaxon_name;
+                         $binomial_name =~ s/\s+/\_/;
+                         $gene_adaptor = $registry->get_adaptor($binomial_name, "core", "Gene");
+                    }
+                    if($gene_adaptor){
+                         $candidate_NCBI_name = $NCBItaxon_name;
+                         $candidate_NCBI_id = $NCBItaxonID;
+                    }else{
+                         print "Gene_adaptor for $NCBItaxon_name impossible to retrieve.\n";
+                         print "Aborting operation on this taxon..\n";
+                         next;
+                    }
+                    next unless(defined $gene_adaptor);
+               }else{#the species name cannot be found in the genome names array
+                    #can its parent's name be found?
+                    print "Gene_adaptor for $NCBItaxon_name unavailable in database: $ensembl_db.\n"; 
                     print "Looking for parent NCBI ID..\n";
                     $NCBI_parent_name = $NCBItaxon->parent->binomial;
                     if(!$NCBI_parent_name){
@@ -1545,13 +1561,21 @@ sub get_backward_orthologies{
                          print "Aborting operation on this taxon..\n";
                          next;
                     }
-                    $NCBI_parent_taxon_id = $NCBItaxon->parent->ncbi_taxid;
+                    $NCBI_parent_taxon_id = $NCBItaxon->parent->ncbi_taxid;#useful?
                     if(!$NCBI_parent_taxon_id){
                          print "No parent taxon id found for $NCBItaxonID.\n";
                          print "Aborting operation on this taxon..\n";
                          next;
                     }
-                    $gene_adaptor = $registry->get_adaptor($NCBI_parent_name, "core", "Gene");
+                    #unless( $genome_names{$NCBI_parent_name} and $genome_taxon_ids{$NCBI_parent_taxon_id} ){
+                    unless( $genome_taxon_ids{$NCBI_parent_taxon_id} ){
+                    #if(!$registry->alias_exists($NCBI_parent_name)){
+                         #its parent doesn't exist in the db either. We skip the species.
+                         #TODO improve - how far up can you go?
+                         print "Gene_adaptor for $NCBI_parent_name unavailable in database: $ensembl_db. Skipping..\n";
+                         next;     
+                    }
+                    $gene_adaptor = $registry->get_adaptor($NCBI_parent_name, "core", "Gene"); 
                     if($gene_adaptor){
                          print "\n============\n";
                          print "$NCBI_parent_name ($NCBI_parent_taxon_id)\n";
@@ -1564,12 +1588,6 @@ sub get_backward_orthologies{
                          next;
                     }
                }
-
-               if(!$genome_taxon_ids{$candidate_NCBI_id}){
-                    print "Genome name: $candidate_NCBI_name ($candidate_NCBI_id) not recognised in ensembl db: $ensembl_db. Skipping this taxon..\n";
-                    next;
-               }
-               my $gdb1;
                eval { local $SIG{'__DIE__'}; $gdb1 = $genomedb_adaptor->fetch_by_taxon_id($candidate_NCBI_id); };  warn $@ if $@;
                
                my $orthologues_mlss = $mlssa->fetch_by_method_link_type_GenomeDBs("ENSEMBL_ORTHOLOGUES",[$gdb1,$gdb2]);
@@ -1581,10 +1599,11 @@ sub get_backward_orthologies{
                while (my $row = $sthHash->fetchrow_hashref) {
                     my @oldDataVec = $sthVec->fetchrow_array(); #take the next row in a vector
                     my $entry = join("\t",@oldDataVec);
-                    
+
                     my $candidate; my $member;
                     my $interactoridA; my $interactoridB;
                     #my $gene_adaptor_a;
+                    my $orthology_count = 0;
                     
                     my $DF_orthologue_id   = $row->{$FN_orthologue_id};
                     my $DF_interaction_id  = $row->{$FN_interaction_id};
@@ -1731,11 +1750,14 @@ sub get_backward_orthologies{
                                                            );
                     $global_count += $orthology_count;
                }
-               $sthHash->finish();
-               $sthVec->finish();
+               $sthHash->finish;
+               $sthVec->finish;
+               $dbh_taxon->disconnect;
+               undef $sthHash;
+               undef $sthVec;
+               undef $dbh_taxon;
           }
-     }
-     $dbh->disconnect;
+     }     
      close $out_data;
      if($err_path){
           close $err_data;
@@ -1888,8 +1910,15 @@ sub get_direct_interactions{
      open (my $out_data,  q{>}, $out_path) or croak("Unable to open $out_path : $!");
      #============
      my $client = REST::Client->new();
-     my $gene_adaptor = $registry->get_adaptor($sourceorg, 'core', 'Gene'); 
      
+     my $gene_adaptor;
+     if($registry->alias_exists($sourceorg)){
+          $gene_adaptor = $registry->get_adaptor($sourceorg, 'core', 'Gene');  
+     }else{
+          print("get_direct_interactions(): source organism string: $sourceorg not recognised by Ensembl. Please double check. Aborting..\n");
+          return;
+     }
+
      my $atleast_one_entry;
      
      my $DF_interaction_id;
@@ -1908,10 +1937,12 @@ sub get_direct_interactions{
      my $DF_det_method;
      my $DF_exp_method;
      
-     #interactor search string
-     my $int_search_string = "search/interactor/";
-     #GLOBAL search string
-     my $glob_search_string = "search/query/";
+     #search string
+     my $glob_search_string = 'search/query/identifier:';
+     my $glob_search_xref = ' OR pxref:'; 
+     #Intact (24/02): All the other xrefs (such as flybase, interpro, go, ..) will go in the 
+     #xrefA and xrefB columns of MITAB 2.7 (columns 24 and 25). 
+     
      #Header
      print $out_data $HEADER_DIRECT, "\n";
      
@@ -1927,36 +1958,16 @@ sub get_direct_interactions{
           chomp $ID;
           next if ($ID eq '');
           
-#          my $idsignature;
-          #get a "signature" to spot the kind of id we are dealing with.
-          #current solution involves getting all the letters starting from the beginning, if there's at least two.
-          #otherwise get the initial three characters whatever they are, and then do a fuzzy regex matching using string::approx
-          #this will be needed in order to be sure to get the same kind of id back.
-          #eg "IPR006259" ----> "IPR"
-#          if($ID =~ /^([a-z]{2,})(.+)/i){
-#               $idsignature = $1;
-#          }else{
-#               $idsignature = substr($ID, 0, 1) . substr($ID, 1, 1) . substr($ID, 1, 1);
-#          }
-          
           print "$ID: Querying IntAct WS for $ID..";
-          my $request = $url . $int_search_string.  $ID . $options;
-          
+          my $request = $url . $glob_search_string . $ID . $glob_search_xref . $ID . $options;
           $client->GET($request);
           print "(", $client->responseCode(), ")";
-          
           my $responseContent = $client->responseContent();
           if(!$responseContent){
-               #Let's try
-               #a global search, to search for the id in non-standard data fields:
-               $request = $url . $glob_search_string.  $ID . $options;
-               $client->GET($request);
-               $responseContent = $client->responseContent();
-               if(!$responseContent){
-                    print("..nothing..\n");
-                    next;    
-               }
+		     print("..nothing..\n");
+             next;    
           }
+
           $atleast_one_entry = 1;
           my @responsetoparse = split(/\n/,$responseContent);
           my $interactionsRetrieved = scalar @responsetoparse;
@@ -1985,13 +1996,18 @@ sub get_direct_interactions{
                $DF_alt_id_b   = _get_interactor_alias_prop_list($MITABDataRow[3]);
                $DF_name_a     = _get_interactor_name($MITABDataRow[4]);
                $DF_name_b     = _get_interactor_name($MITABDataRow[5]);
-               $DF_props_a    = _get_interactor_alias_prop_list($MITABDataRow[19]);
-               $DF_props_b    = _get_interactor_alias_prop_list($MITABDataRow[20]);
+               #$DF_props_a    = _get_interactor_alias_prop_list($MITABDataRow[19]);
+               #$DF_props_b    = _get_interactor_alias_prop_list($MITABDataRow[20]);
+               $DF_props_a    = '-'; #don't exist anymore as of 21/02/2013
+               $DF_props_b    = '-'; #don't exist anymore as of 21/03/2012
                $DF_pub        = $MITABDataRow[8];
                $DF_int_type   = $MITABDataRow[11];
                $DF_det_method = $MITABDataRow[6];
-               $DF_exp_method = $MITABDataRow[24];
+               #$DF_exp_method = $MITABDataRow[24];
+               $DF_exp_method = 'NA';#doesn't exist anymore
 
+               #21/02/2013
+               #this seems to have become useless, no lines seem to contain any Ensembl ID
                $ID_OUT = _get_ensembl_id_from_mitab_data(
                                                     init_id          => $ID,
                                                     acc_numb_a       => $DF_acc_numb_a,
@@ -2482,12 +2498,14 @@ sub _build_query_options{
      my $outputstring;
      
      #eg " AND type:\"physical*\" AND detmethod:\"experimental*\" AND NOT expansion:\"spoke\"";
+     #ATTENZIONE 21/2/2013
+     #http://www.ebi.ac.uk/Tools/webservices/psicquic/intact/webservices/current/search/query/identifier:FBgn0010433 OR pxref:FBgn0010433 AND type:physical* AND detmethod:experimental* AND complex:"-"
      if($no_spoke || $exponly || $physonly){
           my @outputitems;
           
-          push(@outputitems, "type:\"physical*\"") if($physonly);
-          push(@outputitems, "detmethod:\"experimental*\"") if($exponly);
-          push(@outputitems, "NOT expansion:\"spoke\"") if($no_spoke);
+          push(@outputitems, 'type:physical') if($physonly);
+          push(@outputitems, 'detmethod:experimental') if($exponly);
+          push(@outputitems, "complex:\"-\"") if($no_spoke);
           
           $outputstring = join(" AND ", @outputitems);
           $outputstring = " AND " . $outputstring;
@@ -2545,16 +2563,64 @@ sub _get_interactor_name{
      if($nameString eq "-"){
           return $nameString;
      }
-     #multiple names:only get the first
+     #multiple names
+     #eg (21/02/2012) psi-mi:q9vx05_drome(display_long)|uniprotkb:Dmel_CG12985(orf name)|uniprotkb:CG12985(orf name)
+     #eg2 psi-mi:q9viy3_drome(display_long)|uniprotkb:CG17564-RB(gene name)|psi-mi:CG17564-RB(display_short)|uniprotkb:CG17564(orf name)|uniprotkb:Dmel_CG17564(orf name)
+     #get the one with (in this order): 
+     #gene name
+     #orf name
+
+     #get the right one
      if($nameString =~ /\|+/){
           @namesVec = split(/\|/, $nameString);
-          $nameString = $namesVec[0];
-     }
-     
-     if($nameString =~ /^(uniprotkb):(.*)(\(gene name\))/){
-          return $2;
-     }elsif($nameString =~ /^(uniprotkb):(.*)/){ 
-          return $2;
+          foreach my $item (@namesVec){
+              if($item =~ /^(uniprotkb):(\w+)(-RB)(\(gene name\))/){
+                  return $2;       
+              }
+          }
+          foreach my $item (@namesVec){
+              if($item =~ /^(uniprotkb):(\w+)(\(gene name\))/){
+                  return $2;       
+              }
+          }
+          foreach my $item (@namesVec){
+              if($item =~ /^(uniprotkb):(\w+_)(.*)(\(orf name\))/){#uniprotkb:Dmel_CG12985(orf name)
+                  return $3;       
+              }
+          }
+          foreach my $item (@namesVec){
+              if($item =~ /^(psi-mi):(\w+)(\(display_short\))/){
+                  return $2;       
+              }
+          }
+          foreach my $item (@namesVec){
+              if($item =~ /^(psi-mi):(\w+)(-RB)(\(display_short\))/){
+                  return $2;       
+              }
+          }
+          foreach my $item (@namesVec){
+              if($item =~ /^(\w+):(.*)(\(\w+\))/){
+                  return $2;       
+              }
+          }
+          #failing anything else, get the first entry
+          return $namesVec[0];
+     }else{# only one identifier
+         if($nameString =~ /(uniprotkb):(.*)(\(gene name\))/){
+             return $2;       
+         }
+         if($nameString =~ /(uniprotkb):(.*)(-RB)(\(gene name\))/){
+             return $2;       
+         }
+         if($nameString =~ /(uniprotkb):(\w+_)(.*)(\(orf name\))/){
+             return $3;       
+         }
+         if($nameString =~ /(psi-mi):(.*)(\(display_short\))/){
+             return $2;       
+         }#else get anything
+         if($nameString =~ /(\w+):(.*)(\(\w+\))/){
+             return $2;       
+         } 
      }
      return $nameString;
 }
@@ -2578,10 +2644,14 @@ sub _get_interactor_uniprot_id{
      
      #ids in order of preference
      #uniprot accession number preferred to intact cause it's recognised by ensembl
-     if($id =~ /(ensembl):(\w+)\|(.*)/){ #es ensembl:ENSG00000122592
+     if($id =~ /(ensembl):(\w+)\|(.*)/){ #eg ensembl:ENSG00000122592|...
           $value = $2;
-     }elsif ($id =~ /(uniprotkb):(\w+)\|(.*)/){ #es uniprotkb:Q9BXW9
+     }elsif ($id =~ /(ensembl):(\w+)/){#eg ensembl:ENSG00000122592
+     	  $value = $2;
+     }elsif ($id =~ /(uniprotkb):(\w+)\|(.*)/){ #eg uniprotkb:5656456|...
           $value = $2;
+     }elsif ($id =~ /(uniprotkb):(\w+)/){
+     	  $value = $2;
      }elsif($id =~ /(uniprotkb):(\w+-\d+)\|(.*)/){#es uniprotkb:Q9BXW9-2|intact:EBI-596878
           $value = $2;
      }elsif($id =~ /(intact):(EBI-\d+)$/){ #if there's no uniprot, get intact-ebi id
@@ -3119,8 +3189,8 @@ sub _process_homologies{
      my $counter = 0;
      foreach my $homology (@{$homologies}){  
           my $data_line;
-          my $ancestor;
           my $DF_orthologue_id;
+          my $ancestor;
           my $DF_oname; 
           my $DF_odesc;
           my $DF_dnds; 
@@ -3129,11 +3199,19 @@ sub _process_homologies{
           my $DF_fsa_y;
           my $DF_nndist;
 
-          #the following filters the orthologies on the basis of their description             
+          #the following filters the orthologies on the basis of their description            
           $DF_odesc = $homology->description;
           next if ($DF_odesc =~ /paralog/);
           #possible_ortholog: dubious duplication/speciation node labelling.
-          next if ($DF_odesc =~ /possible_ortholog/);
+          #next if ($DF_odesc =~ /possible_ortholog/);
+          #apparent ortholog: can be the results of real duplications followed by 
+          # gene losses but most of the times occur as the result of a wrong gene tree 
+          # topology with a spurious duplication node. Often assembly errors are behind these         
+          #next if ($DF_odesc =~ /apparent_ortholog/);
+          #19/1/2012 Ensembl 65 introduced "projections" (see conversation with Herrero on ML)
+          #they're technically not homologies, we need to discard them
+          next if ($DF_odesc =~ /^projection/);
+          
           next if (($oo_only) && (!($DF_odesc =~ /^ortholog_one2one$/)));
           
           $counter += 1;
@@ -3165,16 +3243,16 @@ sub _process_homologies{
                     
           if((defined($node_x)) && (defined($node_y) )){
                my $root = $node_x->subroot; #method from nested set
-                    if (defined ($root)){
-               eval{
-                    $root->merge_node_via_shared_ancestor($node_y);
-                    $ancestor = $node_x->find_first_shared_ancestor($node_y);   
+               if (defined ($root)){
+                    eval{
+                         $root->merge_node_via_shared_ancestor($node_y);
+                         $ancestor = $node_x->find_first_shared_ancestor($node_y);   
                     };
                     if($@){
                          print "\nAn error occurred ($@), continuing..\n";
                     }
-               if (defined $ancestor){
-                    $DF_fsa_x = $node_x->distance_to_ancestor($ancestor);
+                    if (defined $ancestor){
+                         $DF_fsa_x = $node_x->distance_to_ancestor($ancestor);
                          $DF_fsa_y = $node_y->distance_to_ancestor($ancestor);
                          $DF_nndist = $node_x->distance_to_node($node_y);
                     }
@@ -3189,7 +3267,12 @@ sub _process_homologies{
 
                #OPI
                my $pairwise_alignment_from_multiple = $homology->get_SimpleAlign;
-               $DF_opi = $pairwise_alignment_from_multiple->overall_percentage_identity;
+               if($pairwise_alignment_from_multiple){
+                    $DF_opi = $pairwise_alignment_from_multiple->overall_percentage_identity;
+               }else{
+                    $DF_opi = '-';
+               }
+               
                #$opi = sprintf("%.3f", $overall_pid); #rounded
           
                $DF_orthologue_id = '-' if(!$DF_orthologue_id);
@@ -4148,11 +4231,19 @@ sub compute_multiple_taxa_mean{
           print "======================\n";
           print "RANDOM DATASET: ", $NCBItaxon_name, "\n";
           print "======================\n";
-          my $gene_adaptor = $registry->get_adaptor($NCBItaxon_name, "core", "Gene");
-          if(!$gene_adaptor){
-               print("No gene adaptor found for $NCBItaxon_name. Skipping..");
+          
+          my $gene_adaptor;
+          if($registry->alias_exists($NCBItaxon_name)){
+               $gene_adaptor = $registry->get_adaptor($NCBItaxon_name, "core", "Gene");   
+               if(!$gene_adaptor){
+                    print("No gene adaptor found for $NCBItaxon_name. Skipping..");
+                    next;
+               }  
+          }else{
+               print("compute_multiple_taxa_mean(): taxon name: $NCBItaxon_name not recognised by Ensembl. Skipping\n;");
                next;
           }
+
           my @genes = @{$gene_adaptor->list_stable_ids()};# these are ALL the gene ids for this taxon
           my $total_genes = (scalar(@genes) - 1);
           for(my $j = 0; $j < $dataset_size; $j++){
@@ -4740,8 +4831,18 @@ sub do_network{
      #CHECK FOR the case of NO entries (eg no one to one orthologies)
      
      #ensembl adaptors---------- 
-     my $source_gene_adaptor = $registry->get_adaptor($sourceorg, 'core', 'Gene');
+     my $source_gene_adaptor;
      my $ncbi_taxon_adaptor;
+     if($registry->alias_exists($sourceorg)){
+          $source_gene_adaptor = $registry->get_adaptor($sourceorg, 'core', 'Gene'); 
+          if(!$source_gene_adaptor){
+               print "do_network(): gene adaptor for species $sourceorg impossible to retrieve. Aborting\n";
+               return;
+          }    
+     }else{
+          print "do_network(): source organism name $sourceorg not recognised by Ensembl. Aborting.\n";
+          return;    
+     }
      $ncbi_taxon_adaptor = $registry->get_adaptor($ensembl_db, "compara", "NCBITaxon") if($expand_taxa);
      
      my %coupleexists = ();
@@ -4911,8 +5012,17 @@ sub do_attributes{
      $number_of_elements_start_ds = keys %start_data_set;
      print "Number of unique ids in start dataset: $number_of_elements_start_ds\n" ;
      
-     $gene_adaptor = $registry->get_adaptor($sourceorg, 'core', 'Gene') unless($tag_chimeras);
      
+     if($registry->alias_exists($sourceorg)){
+          $gene_adaptor = $registry->get_adaptor($sourceorg, 'core', 'Gene') unless($tag_chimeras); 
+          if(!$gene_adaptor){
+               print "do_attributes(): gene adaptor for species $sourceorg impossible to retrieve. Aborting\n";
+               return;
+          }    
+     }else{
+          print "do_attributes(): source organism name $sourceorg not recognised by Ensembl. Aborting.\n";
+          return;    
+     }     
      print $out_data_name  "Ensembl_Name\n"; #node attribute: Ensembl name
      print $out_data_novel "Novel_id\n"; #node attribute: present in the original dataset or not?
      
@@ -4957,6 +5067,7 @@ sub do_attributes{
                     my $species_sig = substr($species, 0, 3);
                     $short_sourceorg = join('',$genus_sig,$species_sig);
                }
+               #this should not need the alias_exists() control
                $gene_adaptor = $registry->get_adaptor($org, 'core', 'Gene');
           } 
          
@@ -5033,7 +5144,7 @@ BMC Bioinformatics 2011, 12:289 doi:10.1186/1471-2105-12-289
 
 =head1 LICENSE AND COPYRIGHT
 
-Bio::Homology::InterologWalk is Copyright (c) 2010 Giuseppe Gallone
+Bio::Homology::InterologWalk is Copyright (c) 2010-2013 Giuseppe Gallone
 All rights reserved.
 
 This library is free software; you can redistribute it and/or modify

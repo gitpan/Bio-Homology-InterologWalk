@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl
 #
-# Copyright (c) 2010 Giuseppe Gallone
+# Copyright (c) 2010-2013 Giuseppe Gallone
 #
 # See COPYRIGHT section in walk.pm for usage and distribution rights.
 #

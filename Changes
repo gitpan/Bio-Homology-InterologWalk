@@ -1,5 +1,12 @@
 Revision history for Perl extension Bio::Homology::InterologWalk.
 
+0.6b	Wed May 8 10:29:40 2013
+	Experimental Support for MITAB 2.7 format. IntACT now exports to MITAB 2.7 rather than 2.5. 
+        -setup_ensembl_adaptor() - get_forward_orthologies() - get_backward_orthologies() - get_direct_interactions() : now using $registry->alias_exists() directive to check if user selected species exists in db (change introduced by Ensembl 65+ - moving towards compatibility)
+        -get_interactions() - get_direct_interactions() - _build_query_options() - _get_interactor_name() - _get_interactor_uniprot_id(): experimental support for MITAB 2.7 format (replacing MITAB 2.5 for IntACT ppi representation)
+        -_process_homologies(): deals with "projections" (Ensembl 65+ - moving towards compatibility)
+
+
 0.58	Wed Feb 1 12:28:53 2012
 	-get_forward_orthologies(): fixed bug provoking exception when using 'all' DBs
         -get_backward_orthologies(): fixed bug provoking exception when using 'all' DBs

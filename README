@@ -1,17 +1,17 @@
-Bio-Homology-InterologWalk version 0.58
+Bio-Homology-InterologWalk version 0.6b
 ========================================
 
-This document refers to version 0.58 of Bio::Homology::InterologWalk.
-This version was released February 1st, 2012.
+This document refers to version 0.6b of Bio::Homology::InterologWalk.
+This version was released May 8th, 2013.
 
 INSTALLATION-------------------------------------------------------------------------
 
 To install this module on your system, place the tarball archive file in a 
 temporary directory and call the following:
 
-% gunzip Bio-Homology-InterologWalk-0.58.tar.gz
-% tar xf Bio-Homology-InterologWalk-0.58.tar
-% cd Bio-Homology-InterologWalk-0.58
+% gunzip Bio-Homology-InterologWalk-0.6b.tar.gz
+% tar xf Bio-Homology-InterologWalk-0.6b.tar
+% cd Bio-Homology-InterologWalk-0.6b
 % perl Makefile.PL
 % make
 % make test
@@ -22,7 +22,7 @@ DEPENDENCIES--------------------------------------------------------------------
 This module requires the following modules and libraries:
 
 ===============
-1.  Ensembl API
+1.  Ensembl API (from V. 59 to V. 64)
 ===============
     
 The Ensembl project is currently branched in two sub-projects:
@@ -163,7 +163,7 @@ Original author:  Giuseppe Gallone
 CPAN ID: GGALLONE
 GDOTGalloneATsmsDOTedDOTacDOTuk
 
-Copyright (C) 2010-2012 by Giuseppe Gallone
+Copyright (C) 2010-2013 by Giuseppe Gallone
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
 

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# Copyright (c) 2010 Giuseppe Gallone
+# Copyright (c) 2010-2013 Giuseppe Gallone
 #
 # See COPYRIGHT section in walk.pm for usage and distribution rights.
 #
@@ -82,13 +82,13 @@ $out_path = $work_dir . $out_filename;
 my $ensembl_db = 'ensembl';
 
 #1) set up the Ensembl compara connection
-my $registry = Bio::Homology::InterologWalk::setup_ensembl_adaptor(
+my $f_registry = Bio::Homology::InterologWalk::setup_ensembl_adaptor(
                                                    connect_to_db    => $ensembl_db,
                                                    source_org       => $sourceorg,
                                                    dest_org         => $destorg,
                                                    #verbose         => 1
                                                    );
-if(!$registry){
+if(!$f_registry){
     print "\nThere were problems setting up the connection to Ensembl. Aborting..\n";
     exit;
 }
@@ -101,7 +101,7 @@ if($ensembl_db eq "all"){
 }
 $start_run = time;
 my $RC1 = Bio::Homology::InterologWalk::get_forward_orthologies(
-                                                registry      => $registry,
+                                                registry      => $f_registry,
                                                 ensembl_db    => $ensembl_db,
                                                 input_path    => $in_path,
                                                 output_path   => $out_path,
@@ -117,8 +117,8 @@ $end_run = time;
 $run_time = $end_run - $start_run;                                 
 print "*FINISHED* Job took $run_time seconds";
 
-#reset the registry (get another identical one later)
-$registry->clear();
+#reset the registry
+$f_registry->clear();
 
 #reset file paths. Former output is new input
 $in_path = $out_path;
@@ -154,13 +154,13 @@ my $err_filename = $Bio::Homology::InterologWalk::VERSIONEX . $infilename. $Bio:
 $out_path = $work_dir . $out_filename;
 $err_path = $work_dir . $err_filename;
 
-#4) get the same registry 
-$registry = Bio::Homology::InterologWalk::setup_ensembl_adaptor(
+#4) get a registry 
+my $b_registry = Bio::Homology::InterologWalk::setup_ensembl_adaptor(
                                                    connect_to_db   => $ensembl_db,
                                                    source_org      => $sourceorg,
                                                    dest_org        => $destorg,
                                                    );
-if(!$registry){
+if(!$b_registry){
     print "\nThere were problems setting up the connection to Ensembl. Aborting..\n";
     exit;
 }
@@ -168,7 +168,7 @@ if(!$registry){
 print "\n\n", colored ("Retrieving orthologs back in source organism from Ensembl Compara ($ensembl_db database)...", 'green'), "\n\n";
 $start_run = time;
 my $RC3 = Bio::Homology::InterologWalk::get_backward_orthologies(
-                                                 registry       => $registry,
+                                                 registry       => $b_registry,
                                                  ensembl_db     => $ensembl_db,
                                                  input_path     => $in_path,
                                                  output_path    => $out_path,
@@ -184,7 +184,7 @@ if(!$RC3){
 $end_run = time;
 $run_time = $end_run - $start_run;                               
 print "*FINISHED* Job took $run_time seconds";
-$registry->clear(); 
+$b_registry->clear(); 
 
 $in_path = $out_path;
 $out_filename = $Bio::Homology::InterologWalk::VERSIONEX . $infilename. $Bio::Homology::InterologWalk::OUTEX5;

@@ -2,9 +2,8 @@
 require 5.008006;
 use ExtUtils::MakeMaker;
 
-# Do our own prerequisite checking here. A lot of this
-# code was borrowed from the Makefile.PL supplied with
-# Net-FTPServer
+# Do our own prerequisite checking here, because PREREQ_PM is a really poor solution. 
+# A lot of this code was borrowed from the Makefile.PL supplied with Net-FTPServer
 
 
 my %modules = (
